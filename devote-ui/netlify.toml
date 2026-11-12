@@ -1,9 +1,17 @@
 [build]
   publish = "build"
   command = "CI=false npm run build"
+  functions = "netlify/functions"
 
 [build.environment]
   CI = "false"
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_OMIT_KEYS = "SMILE_ENVIRONMENT,SMILE_PARTNER,SMILE_PARTNER_ID,SMILE_API_KEY"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*"

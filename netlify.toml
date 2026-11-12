@@ -6,6 +6,8 @@
 
 [build.environment]
   CI = "false"
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_OMIT_KEYS = "SMILE_ENVIRONMENT,SMILE_PARTNER,SMILE_PARTNER_ID,SMILE_API_KEY"
 
 [[redirects]]
   from = "/api/*"

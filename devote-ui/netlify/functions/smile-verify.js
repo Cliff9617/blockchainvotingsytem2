@@ -48,7 +48,7 @@ function buildSecKey(partnerId, apiKey, jobId) {
 
 // ── Smile ID helper ─────────────────────────────────────────────────────────
 async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
-  const partnerId = process.env.SMILE_PARTNER_ID;
+  const partnerId = process.env.SMILE_PARTNER_ID || process.env.SMILE_PARTNER;
   const apiKey    = process.env.SMILE_API_KEY;
   const env       = (process.env.SMILE_ENVIRONMENT || 'sandbox').toLowerCase();
 
