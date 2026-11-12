@@ -9,8 +9,8 @@ import {
   detectFace,
   checkFacePosition,
 } from '../utils/faceDetection';
-import { validatePdfFile, uploadVoterIdDocument } from '../services/storageService';
 import { verifyVoterIdentity } from '../services/smileIdService';
+import { runOcrOnImage, verifyKenyanIdDocument } from '../utils/kenyanIdOcr';
 
 const RegistrationPage = ({
   onConnectWallet,
@@ -46,17 +46,18 @@ const RegistrationPage = ({
   const [wards, setWards] = useState([]);
   const [dataLoadingError, setDataLoadingError] = useState(false);
 
-  // Step 3: ID Document (PDF) & Selfie
-  const [idDocument, setIdDocument] = useState(null);
-  const [idDocumentName, setIdDocumentName] = useState('');
-  const [idDocumentUploaded, setIdDocumentUploaded] = useState(false);
-  const [idDocumentUrl, setIdDocumentUrl] = useState('');
-  const [idDocumentProgress, setIdDocumentProgress] = useState(0);
-  const [isUploadingIdDoc, setIsUploadingIdDoc] = useState(false);
+  // Step 3: ID Photos (Front & Back) & Selfie
+  const [idFrontPhoto, setIdFrontPhoto] = useState(null);
+  const [idFrontPreview, setIdFrontPreview] = useState(null);
+  const [idBackPhoto, setIdBackPhoto] = useState(null);
+  const [idBackPreview, setIdBackPreview] = useState(null);
+  const [isOcrScanning, setIsOcrScanning] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrResult, setOcrResult] = useState(null);
+  const [ocrError, setOcrError] = useState('');
   const [selfie, setSelfie] = useState(null);
   const [selfiePreview, setSelfiePreview] = useState(null);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
-  const [idDocumentError, setIdDocumentError] = useState('');
   const [selfieError, setSelfieError] = useState('');
 
   // Face detection state
@@ -66,10 +67,7 @@ const RegistrationPage = ({
   const [countdown, setCountdown] = useState(null);
   const [isAutoCapturing, setIsAutoCapturing] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [videoPreviewFailed, setVideoPreviewFailed] = useState(false);
-  const [cameraInitializing, setCameraInitializing] = useState(false);
   const [cameraError, setCameraError] = useState('');
-  const [streamObtained, setStreamObtained] = useState(false);
 
   // Webcam refs
   const videoRef = useRef(null);
@@ -228,68 +226,94 @@ const RegistrationPage = ({
     }
   };
 
-  // Step 3: ID Document (PDF) handlers
-  const handleIdDocumentSelect = (e) => {
-    const file = e.target.files[0];
-    console.log("============================================");
-    console.log("[DIAG] handleIdDocumentSelect FIRED");
-    console.log("[DIAG] Event target:", e.target);
-    console.log("[DIAG] Event target.files:", e.target.files);
-    console.log("[DIAG] file:", file?.name, file?.size, file?.type);
-    if (!file) {
-      console.log("[DIAG] No file in event, returning early");
+  // Step 3: ID Photo (Front & Back) handlers
+  const handleIdPhotoSelect = async (e, side) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setOcrError('Please upload an image file (JPEG, PNG, or WebP).');
       return;
     }
 
-    const validation = validatePdfFile(file);
-    console.log("[DIAG] validatePdfFile result:", JSON.stringify(validation));
-    if (!validation.valid) {
-      console.log("[DIAG] Validation FAILED:", validation.error);
-      setIdDocumentError(validation.error);
-      setIdDocument(null);
-      setIdDocumentName('');
-      setIdDocumentUploaded(false);
+    if (file.size > 10 * 1024 * 1024) {
+      setOcrError('Image size must be 10 MB or less.');
       return;
     }
 
-    console.log("[DIAG] Validation PASSED, about to set state");
-    setIdDocumentError('');
-    setIdDocument(file);
-    setIdDocumentName(file.name);
-    setIdDocumentUploaded(true);
-    console.log("[DIAG] State set. idDocument =", file.name, "| idDocumentUploaded = true");
-    console.log("============================================");
+    setOcrError('');
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const base64 = evt.target.result;
+      let currentFront = idFrontPreview;
+      let currentBack = idBackPreview;
+
+      if (side === 'front') {
+        setIdFrontPhoto(file);
+        setIdFrontPreview(base64);
+        currentFront = base64;
+      } else {
+        setIdBackPhoto(file);
+        setIdBackPreview(base64);
+        currentBack = base64;
+      }
+
+      if (side === 'front' || currentFront) {
+        await runOcrValidation(currentFront, currentBack);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleUploadIdDocument = async () => {
-    // Stub - actual upload logic would go here
-    if (!idDocument) {
-      setIdDocumentError('Please select a PDF file first');
-      return;
-    }
-    setIsUploadingIdDoc(true);
-    setIdDocumentError('');
+  const runOcrValidation = async (frontBase64, backBase64) => {
+    if (!frontBase64) return;
+    setIsOcrScanning(true);
+    setOcrProgress(15);
+    setOcrError('');
+    setOcrResult(null);
+
     try {
-      // Simulate upload
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIdDocumentUploaded(true);
-      setIdDocumentProgress(100);
+      const { text: frontText } = await runOcrOnImage(frontBase64, (p) => setOcrProgress(p));
+      let backText = '';
+      if (backBase64) {
+        try {
+          const { text } = await runOcrOnImage(backBase64);
+          backText = text;
+        } catch (_) {}
+      }
+
+      const result = verifyKenyanIdDocument({
+        frontText,
+        backText,
+        expectedId: personalDetails.nationalId,
+        expectedFullName: personalDetails.fullName,
+        expectedDob: personalDetails.dob,
+      });
+
+      setOcrResult(result);
+      if (!result.isValid) {
+        setOcrError(result.summary || 'Uploaded document does not match entered details.');
+      }
     } catch (err) {
-      setIdDocumentError(err.message || 'Upload failed');
+      console.error('[RegistrationPage] OCR failed:', err);
+      setOcrError('Could not read National ID clearly. Please upload a sharper, glare-free photo.');
     } finally {
-      setIsUploadingIdDoc(false);
+      setIsOcrScanning(false);
+      setOcrProgress(0);
     }
   };
 
-  const handleReplaceIdDocument = () => {
-    setIdDocument(null);
-    setIdDocumentName('');
-    setIdDocumentUploaded(false);
-    setIdDocumentUrl('');
-    setIdDocumentProgress(0);
-    setIdDocumentError('');
-    const fileInput = document.getElementById('national-id-pdf-upload');
-    if (fileInput) fileInput.value = '';
+  const handleReplaceIdPhoto = (side) => {
+    if (side === 'front') {
+      setIdFrontPhoto(null);
+      setIdFrontPreview(null);
+    } else {
+      setIdBackPhoto(null);
+      setIdBackPreview(null);
+    }
+    setOcrResult(null);
+    setOcrError('');
   };
 
   // Face detection for auto-capture
@@ -316,6 +340,7 @@ const RegistrationPage = ({
 
     // Start detection loop directly since video is already playing
     startDetectionLoop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraReady]);
 
   const startDetectionLoop = () => {
@@ -428,7 +453,6 @@ const RegistrationPage = ({
     
     // Reset all states
     setCameraReady(false);
-    setVideoPreviewFailed(false);
     setFaceDetectionReady(false);
     setCameraError('');
     setGuidanceMessage('Position your face within the oval');
@@ -568,10 +592,8 @@ const RegistrationPage = ({
 
     // Reset states
     setCameraReady(false);
-    setVideoPreviewFailed(false);
     setFaceDetectionReady(false);
     setCameraError('');
-    setCameraInitializing(false);
 
     // Restart camera
     await startWebcam();
@@ -597,8 +619,6 @@ const RegistrationPage = ({
     stopWebcam();
     setShowWebcamModal(false);
     setCameraReady(false);
-    setCameraInitializing(false);
-    setVideoPreviewFailed(false);
     setCameraError('');
     setFaceDetectionReady(false);
     setFaceDetectionError('');
@@ -701,8 +721,9 @@ const RegistrationPage = ({
     console.log('selfiePreview available:', !!selfiePreview);
     console.log('selfiePreview length:', selfiePreview ? selfiePreview.length : 0);
     console.log('selfie File available:', !!selfie);
-    console.log('idDocumentUrl:', idDocumentUrl);
-    console.log('idDocumentUploaded:', idDocumentUploaded);
+    console.log('idFrontPreview available:', !!idFrontPreview);
+    console.log('idBackPreview available:', !!idBackPreview);
+    console.log('ocrResult isValid:', ocrResult?.isValid);
     
     try {
       console.log('STEP 2: Validation passed, building registration data');
@@ -753,6 +774,10 @@ const RegistrationPage = ({
           dob: personalDetails.dob || '1995-01-01',
           walletAddress: account || `wallet_${personalDetails.nationalId}`,
           userId: `voter_${personalDetails.nationalId}`,
+          idFrontBase64: idFrontPreview,
+          idBackBase64: idBackPreview,
+          selfieBase64: selfieBase64,
+          ocrResult: ocrResult,
         });
         console.log('[RegistrationPage] Smile ID result:', smileResult);
       } catch (smileErr) {
@@ -776,7 +801,10 @@ const RegistrationPage = ({
         constituency: votingArea.constituency,
         ward: votingArea.ward,
         pin: personalDetails.pin,
-        idDocumentUrl: idDocumentUrl,
+        idFrontBase64: idFrontPreview || '',
+        idBackBase64: idBackPreview || '',
+        ocrMatched: ocrResult?.isValid || false,
+        ocrSummary: ocrResult?.summary || '',
         selfieBase64: selfieBase64,
         status: initialStatus,
         smileStatus: smileStatus,
@@ -834,12 +862,12 @@ const RegistrationPage = ({
       // Reset form
       setPersonalDetails({ fullName: '', nationalId: '', dob: '', pin: '', confirmPin: '' });
       setVotingArea({ county: '', constituency: '', ward: '' });
-      setIdDocument(null);
-      setIdDocumentName('');
-      setIdDocumentUploaded(false);
-      setIdDocumentUrl('');
-      setIdDocumentProgress(0);
-      setIsUploadingIdDoc(false);
+      setIdFrontPhoto(null);
+      setIdFrontPreview(null);
+      setIdBackPhoto(null);
+      setIdBackPreview(null);
+      setOcrResult(null);
+      setOcrError('');
       setSelfie(null);
       setSelfiePreview(null);
       setCurrentStep(1);
@@ -859,45 +887,33 @@ const RegistrationPage = ({
   };
 
   const handleSubmit = async () => {
-    console.log("BUTTON CLICKED");
     // Prevent double submit
     if (isSubmitting) {
       console.log('[RegistrationPage] Already submitting, ignoring duplicate click');
       return;
     }
 
-    if (!idDocumentUploaded) {
-      setIdDocumentError('Please select a valid National ID PDF');
+    if (!idFrontPhoto || !idBackPhoto) {
+      setOcrError('Please upload both front and back photos of your Kenyan National ID.');
       return;
     }
-    if (!selfie) {
+
+    if (!ocrResult || !ocrResult.isValid) {
+      setOcrError(ocrResult?.summary || 'National ID verification failed. Please check your entered details and upload clear photos.');
+      return;
+    }
+
+    if (!selfie && !selfiePreview) {
       setSelfieError('Please take a selfie');
       return;
     }
 
     console.log('[RegistrationPage] handleSubmit: Setting isSubmitting=true');
     setIsSubmitting(true);
-
-    // Upload ID document if not yet uploaded
-    if (idDocument && !idDocumentUrl) {
-      console.log('[RegistrationPage] Uploading ID document before submission...');
-      const voterId = `voter_${personalDetails.nationalId}_${Date.now()}`;
-      try {
-        const downloadUrl = await uploadVoterIdDocument(idDocument, voterId);
-        console.log('[RegistrationPage] ID document uploaded, URL:', downloadUrl);
-        setIdDocumentUrl(downloadUrl);
-      } catch (uploadError) {
-        console.error('[RegistrationPage] Failed to upload ID document:', uploadError);
-        setIdDocumentError('Failed to upload PDF. Please check your connection and try again.');
-        setIsSubmitting(false);
-        return;
-      }
-    }
     
     try {
       await submitRegistration();
     } catch (error) {
-      // Safety net: catch any unhandled errors from submitRegistration
       console.error('[RegistrationPage] Unhandled error in handleSubmit:', error);
       setIsSubmitting(false);
     }
@@ -1197,199 +1213,203 @@ const RegistrationPage = ({
         {/* Step 3: ID & Selfie */}
         {currentStep === 3 && (
           <div className="bg-white rounded-xl shadow-md p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">National ID & Selfie</h2>
-            <p className="text-gray-600 mb-6">Upload your National ID scan (PDF) and take a selfie for verification.</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">National ID & Selfie Verification</h2>
+            <p className="text-gray-500 mb-6 text-sm">Upload photos of your Kenyan National ID (front & back) and capture a selfie.</p>
 
-            <div className="space-y-8">
-              {/* National ID PDF Upload - Replaces image upload */}
+            <div className="space-y-6">
+              {/* ID Photos (Front & Back) */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">1. National ID Scan (PDF)</h3>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-green-500 transition-colors">
-                  {idDocumentUploaded ? (
-                    <div className="space-y-4">
-                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                        <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                <h3 className="text-base font-semibold text-gray-800 mb-3">1. Kenyan National ID Photos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Front Photo */}
+                  <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-all ${
+                    idFrontPreview ? 'border-green-400 bg-green-50/40' : 'border-gray-300 hover:border-green-500 bg-gray-50/50'
+                  }`}>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">ID Front Side</p>
+                    {idFrontPreview ? (
+                      <div className="space-y-3">
+                        <img 
+                          src={idFrontPreview} 
+                          alt="ID Front" 
+                          className="w-full h-36 object-cover rounded-lg shadow-sm border border-gray-200" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleReplaceIdPhoto('front')}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                        >
+                          Change Front Photo
+                        </button>
                       </div>
-                      <p className="text-green-700 font-semibold">✓ PDF Uploaded Successfully</p>
-                      <p className="text-sm text-gray-600">{idDocumentName}</p>
-                      <button
-                        onClick={handleReplaceIdDocument}
-                        className="text-sm text-blue-600 hover:text-blue-700 underline font-medium"
-                      >
-                        Replace PDF
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    ) : (
+                      <div className="py-4">
+                        <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
+                        <label className="cursor-pointer">
+                          <span className="px-3.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-colors inline-block shadow-sm">
+                            Upload Front
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => handleIdPhotoSelect(e, 'front')}
+                            className="hidden"
+                          />
+                        </label>
+                        <p className="text-xs text-gray-400 mt-2">JPEG, PNG or WebP</p>
                       </div>
-                      
-                      {!idDocument ? (
-                        <div>
-                          <label className="cursor-pointer">
-                            <span className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-block">
-                              Select PDF
-                            </span>
-                            <input
-                              id="national-id-pdf-upload"
-                              type="file"
-                              accept=".pdf,application/pdf"
-                              onChange={handleIdDocumentSelect}
-                              className="hidden"
-                            />
-                          </label>
-                          <p className="text-sm text-gray-500 mt-2">
-                            Only PDF files are accepted (Max 10 MB)
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="bg-gray-50 rounded-lg p-3 inline-block mx-auto">
-                            <p className="text-sm font-medium text-gray-700">{idDocumentName}</p>
-                            <p className="text-xs text-gray-500">
-                              {(idDocument.size / 1024 / 1024).toFixed(1)} MB
-                            </p>
-                          </div>
-                          
-                          {/* Upload Progress Bar */}
-                          {isUploadingIdDoc && (
-                            <div className="mt-3">
-                              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                                <span>Uploading PDF...</span>
-                                <span>{Math.round(idDocumentProgress)}%</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                  className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
-                                  style={{ width: `${idDocumentProgress}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2 justify-center">
-                            <button
-                              onClick={handleUploadIdDocument}
-                              disabled={isUploadingIdDoc}
-                              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                            >
-                              {isUploadingIdDoc ? 'Uploading...' : 'Upload PDF'}
-                            </button>
-                            <button
-                              onClick={handleReplaceIdDocument}
-                              disabled={isUploadingIdDoc}
-                              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Back Photo */}
+                  <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-all ${
+                    idBackPreview ? 'border-green-400 bg-green-50/40' : 'border-gray-300 hover:border-green-500 bg-gray-50/50'
+                  }`}>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">ID Back Side</p>
+                    {idBackPreview ? (
+                      <div className="space-y-3">
+                        <img 
+                          src={idBackPreview} 
+                          alt="ID Back" 
+                          className="w-full h-36 object-cover rounded-lg shadow-sm border border-gray-200" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleReplaceIdPhoto('back')}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                        >
+                          Change Back Photo
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="py-4">
+                        <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <label className="cursor-pointer">
+                          <span className="px-3.5 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-colors inline-block shadow-sm">
+                            Upload Back
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => handleIdPhotoSelect(e, 'back')}
+                            className="hidden"
+                          />
+                        </label>
+                        <p className="text-xs text-gray-400 mt-2">JPEG, PNG or WebP</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {idDocumentError && (
-                  <p className="mt-2 text-sm text-red-600">{idDocumentError}</p>
+
+                {/* OCR Status / Feedback */}
+                {isOcrScanning && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3 text-xs text-blue-800">
+                    <svg className="animate-spin h-4 w-4 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Extracting details from ID and verifying against entered information...{ocrProgress > 0 ? ` (${Math.round(ocrProgress)}%)` : ''}</span>
+                  </div>
+                )}
+
+                {!isOcrScanning && ocrResult && ocrResult.isValid && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-xs text-green-800">
+                    <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="font-medium">National ID document verified: Authenticity confirmed and details match.</span>
+                  </div>
+                )}
+
+                {!isOcrScanning && ocrError && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-xs text-red-700">
+                    <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>{ocrError}</span>
+                  </div>
                 )}
               </div>
 
               {/* Selfie Section */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">2. Live Selfie — Your Face</h3>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
+                <h3 className="text-base font-semibold text-gray-800 mb-3">2. Live Facial Selfie</h3>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center bg-gray-50/50">
                   {selfiePreview ? (
-                    <div className="space-y-4">
-                      <div className="relative inline-block">
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="w-32 h-40 rounded-full border-4 border-green-400 opacity-50"></div>
-                        </div>
-                        <img 
-                          src={selfiePreview} 
-                          alt="Selfie Preview" 
-                          className="w-40 h-40 object-cover rounded-full mx-auto shadow-md"
-                        />
-                      </div>
+                    <div className="space-y-3">
+                      <img 
+                        src={selfiePreview} 
+                        alt="Selfie Preview" 
+                        className="w-28 h-28 object-cover rounded-full mx-auto shadow-md border-2 border-green-500"
+                      />
                       <div>
-                        <p className="text-sm text-gray-600 mb-2">Selfie captured successfully</p>
+                        <p className="text-xs text-green-700 font-medium">Selfie captured</p>
                         <button
+                          type="button"
                           onClick={retakeSelfie}
-                          className="text-sm text-blue-600 hover:text-blue-700 underline"
+                          className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 font-medium"
                         >
                           Retake Selfie
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a9 9 0 0118 0v1a9 9 0 01-18 0V9z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <button
-                          onClick={startWebcam}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          Take Selfie
-                        </button>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Use your camera to take a selfie
-                        </p>
-                      </div>
+                    <div>
+                      <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a9 9 0 0118 0v1a9 9 0 01-18 0V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <button
+                        type="button"
+                        onClick={startWebcam}
+                        className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        Open Camera & Take Selfie
+                      </button>
+                      <p className="text-xs text-gray-400 mt-2">Facial biometrics are cross-referenced with your National ID photo.</p>
                     </div>
                   )}
                 </div>
                 {selfieError && (
-                  <p className="mt-2 text-sm text-red-600">{selfieError}</p>
+                  <p className="mt-2 text-xs text-red-600">{selfieError}</p>
                 )}
               </div>
 
               {/* Security Note */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start">
-                  <svg className="w-5 h-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm text-blue-800">
-                    <strong>Privacy Notice:</strong> Your documents are uploaded securely and only visible to IEBC staff for verification purposes. They are never stored on the blockchain.
-                  </p>
-                </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>IEBC Security Notice:</strong> All voter identity documents are encrypted and verified against official Kenyan National ID records via Smile ID. Inauthentic documents are automatically rejected.
+                </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-between pt-4">
+              <div className="flex justify-between pt-2">
                 <button
+                  type="button"
                   onClick={() => setCurrentStep(2)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-all"
+                  className="px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition-all"
                 >
                   Back
                 </button>
-                {console.log("Button disabled:", isSubmitting || !idDocumentUploaded)}
-                {console.log("isSubmitting =", isSubmitting)}
-                {console.log("idDocumentUploaded =", idDocumentUploaded)}
-                {console.log("Rendering Submit Button")}
                 <button
+                  type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !idDocumentUploaded}
-                  className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
+                  disabled={isSubmitting || !idFrontPreview || !idBackPreview || !ocrResult?.isValid || !selfiePreview}
+                  className="px-6 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
                 >
                   {isSubmitting ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Submitting...
+                      Verifying & Submitting...
                     </span>
                   ) : (
-                    'Submit Registration Request'
+                    'Submit for Verification'
                   )}
                 </button>
               </div>

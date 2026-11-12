@@ -223,7 +223,7 @@ const useMultiSig = (contract, account, userRole) => {
   // Refresh on mount and account change
   useEffect(() => {
     fetchProposals();
-  }, [contract]);
+  }, [contract, fetchProposals]);
 
   return {
     // State

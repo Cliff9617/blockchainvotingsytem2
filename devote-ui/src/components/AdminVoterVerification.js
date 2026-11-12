@@ -245,8 +245,19 @@ const AdminVoterVerification = () => {
 
   // Open modal for image preview
   const openImageModal = (voter, imageType) => {
-    const imageData = imageType === 'id' ? voter.idPhotoBase64 : voter.selfieBase64;
-    const imageLabel = imageType === 'id' ? 'ID Photo' : 'Selfie';
+    let imageData = null;
+    let imageLabel = '';
+    if (imageType === 'front' || imageType === 'id') {
+      imageData = voter.idFrontBase64 || voter.idPhotoBase64;
+      imageLabel = 'National ID (Front)';
+    } else if (imageType === 'back') {
+      imageData = voter.idBackBase64;
+      imageLabel = 'National ID (Back)';
+    } else {
+      imageData = voter.selfieBase64;
+      imageLabel = 'Live Selfie';
+    }
+
     setSelectedVoter({ 
       image: imageData, 
       label: imageLabel, 
@@ -478,25 +489,41 @@ const AdminVoterVerification = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col space-y-3">
-                      {/* National ID Photo */}
+                      {/* National ID Front */}
                       <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-gray-600 mb-1">National ID Photo</span>
-                        {voter.idPhotoBase64 ? (
+                        <span className="text-xs font-semibold text-gray-600 mb-1">ID Front</span>
+                        {(voter.idFrontBase64 || voter.idPhotoBase64) ? (
                           <div className="relative">
                             <img
-                              src={voter.idPhotoBase64}
-                              alt="National ID Photo"
-                              className="w-24 h-24 object-cover rounded border border-gray-300 cursor-pointer hover:border-blue-500 transition-colors"
-                              onClick={() => openImageModal(voter, 'id')}
+                              src={voter.idFrontBase64 || voter.idPhotoBase64}
+                              alt="ID Front"
+                              className="w-24 h-16 object-cover rounded border border-gray-300 cursor-pointer hover:border-blue-500 transition-colors"
+                              onClick={() => openImageModal(voter, 'front')}
                               title="Click to enlarge"
                             />
                           </div>
                         ) : (
-                          <div className="w-24 h-24 flex items-center justify-center bg-gray-100 border border-gray-300 rounded">
-                            <span className="text-xs text-gray-400 text-center px-1">Image not available</span>
+                          <div className="w-24 h-16 flex items-center justify-center bg-gray-100 border border-gray-300 rounded">
+                            <span className="text-xs text-gray-400 text-center px-1">No front image</span>
                           </div>
                         )}
                       </div>
+
+                      {/* National ID Back */}
+                      {voter.idBackBase64 && (
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-gray-600 mb-1">ID Back</span>
+                          <div className="relative">
+                            <img
+                              src={voter.idBackBase64}
+                              alt="ID Back"
+                              className="w-24 h-16 object-cover rounded border border-gray-300 cursor-pointer hover:border-blue-500 transition-colors"
+                              onClick={() => openImageModal(voter, 'back')}
+                              title="Click to enlarge"
+                            />
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Live Selfie */}
                       <div className="flex flex-col">
@@ -506,17 +533,26 @@ const AdminVoterVerification = () => {
                             <img
                               src={voter.selfieBase64}
                               alt="Live Selfie"
-                              className="w-24 h-24 object-cover rounded border border-gray-300 cursor-pointer hover:border-blue-500 transition-colors"
+                              className="w-24 h-24 object-cover rounded-full border border-gray-300 cursor-pointer hover:border-blue-500 transition-colors"
                               onClick={() => openImageModal(voter, 'selfie')}
                               title="Click to enlarge"
                             />
                           </div>
                         ) : (
-                          <div className="w-24 h-24 flex items-center justify-center bg-gray-100 border border-gray-300 rounded">
-                            <span className="text-xs text-gray-400 text-center px-1">Image not available</span>
+                          <div className="w-24 h-16 flex items-center justify-center bg-gray-100 border border-gray-300 rounded">
+                            <span className="text-xs text-gray-400 text-center px-1">No selfie</span>
                           </div>
                         )}
                       </div>
+
+                      {/* OCR Match Indicator */}
+                      {voter.ocrMatched !== undefined && voter.ocrMatched !== null && (
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium text-center ${
+                          voter.ocrMatched ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {voter.ocrMatched ? '✓ OCR Verified' : '✗ OCR Mismatch'}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

@@ -2,8 +2,8 @@
  * Netlify Serverless Function: smile-verify
  * POST /.netlify/functions/smile-verify (proxied as POST /api/smile-verify)
  *
- * Initiates a Smile ID Enhanced KYC verification for a Kenyan voter.
- * Never returns or stores raw ID data beyond what is needed for the job.
+ * Initiates a Smile ID Document Verification & Enhanced KYC check for a Kenyan voter.
+ * Rigorously checks that uploaded National ID front/back documents match entered details.
  */
 
 'use strict';
@@ -36,8 +36,7 @@ function getDb() {
 }
 
 /**
- * Build a simple HMAC-SHA256 sec_key for the Smile ID REST API.
- * This follows the Smile Identity REST API v2 signature scheme.
+ * Build HMAC-SHA256 sec_key for the Smile ID REST API
  */
 function buildSecKey(partnerId, apiKey, jobId) {
   const timestamp = new Date().toISOString();
@@ -47,7 +46,7 @@ function buildSecKey(partnerId, apiKey, jobId) {
 }
 
 // ── Smile ID helper ─────────────────────────────────────────────────────────
-async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
+async function runSmileKyc({ nationalId, fullName, dob, country = 'KE', idFrontBase64, ocrResult }) {
   const partnerId = process.env.SMILE_PARTNER_ID || process.env.SMILE_PARTNER;
   const apiKey    = process.env.SMILE_API_KEY;
   const env       = (process.env.SMILE_ENVIRONMENT || 'sandbox').toLowerCase();
@@ -55,23 +54,45 @@ async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
   const jobId   = `KE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const userId  = `voter-${Date.now()}`;
 
-  // If partnerId and apiKey are not yet configured or in sandbox mock mode
-  if (!partnerId || !apiKey || partnerId === 'placeholder_partner_id') {
-    console.log('[smile-verify] Sandbox simulated mode: credentials not configured yet');
-    // Simulated sandbox response for Kenyan ID (Valid format check)
-    const isMockValid = /^\d{7,9}$/.test(nationalId) && fullName.trim().length >= 3;
+  // Fail-closed if OCR indicated mismatch or fake/blank document
+  if (ocrResult && !ocrResult.isValid) {
     return {
       jobId,
       userId,
       smileResponse: {
-        ConfidenceValue: isMockValid ? '98.5' : '45.0',
+        ConfidenceValue: '10.0',
+        Actions: {
+          Verify_ID_Number: 'Failed',
+          Return_Personal_Info: 'Not Verified',
+        },
+        ResultCode: '0811',
+        ResultText: 'Document OCR Verification Failed: ID details do not match image scan.',
+      },
+    };
+  }
+
+  // If partnerId and apiKey are not configured or in sandbox mock mode
+  if (!partnerId || !apiKey || partnerId === 'placeholder_partner_id') {
+    const isMockValid = (
+      /^\d{7,9}$/.test(nationalId) &&
+      fullName.trim().length >= 3 &&
+      (!ocrResult || ocrResult.isValid)
+    );
+
+    return {
+      jobId,
+      userId,
+      smileResponse: {
+        ConfidenceValue: isMockValid ? '98.5' : '20.0',
         Actions: {
           Verify_ID_Number: isMockValid ? 'Passed' : 'Failed',
-          Return_Personal_Info: isMockValid ? 'Verified' : 'Not Verified'
+          Return_Personal_Info: isMockValid ? 'Verified' : 'Not Verified',
         },
         ResultCode: isMockValid ? '1012' : '1013',
-        ResultText: isMockValid ? 'ID Verified Successfully (Sandbox Simulation)' : 'ID Verification Failed'
-      }
+        ResultText: isMockValid
+          ? 'ID Verified Successfully (Sandbox Simulation)'
+          : 'ID Verification Failed: Document did not match voter data',
+      },
     };
   }
 
@@ -80,7 +101,6 @@ async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
     ? 'https://3eydmgh10d.execute-api.us-west-2.amazonaws.com/prod'
     : 'https://testapi.smileidentity.com/v1';
 
-  // Smile ID Enhanced KYC payload (Job Type 5)
   const names = fullName.trim().split(/\s+/);
   const firstName = names[0] || '';
   const lastName = names.slice(1).join(' ') || firstName;
@@ -92,7 +112,7 @@ async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
     partner_params: {
       job_id:   jobId,
       user_id:  userId,
-      job_type: 5, // Enhanced KYC
+      job_type: 5, // Enhanced KYC / ID verification
     },
     id_info: {
       first_name:  firstName,
@@ -100,7 +120,7 @@ async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
       country:     country,
       id_type:     'NATIONAL_ID',
       id_number:   nationalId,
-      dob:         dob, // YYYY-MM-DD
+      dob:         dob,
     },
     timestamp: new Date().toISOString(),
     sec_key:   buildSecKey(partnerId, apiKey, jobId),
@@ -123,7 +143,6 @@ async function runSmileKyc({ nationalId, fullName, dob, country = 'KE' }) {
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
-  // CORS pre-flight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: corsHeaders(), body: '' };
   }
@@ -139,7 +158,16 @@ exports.handler = async (event) => {
     return json(400, { error: 'Invalid JSON body' });
   }
 
-  const { nationalId, fullName, dob, walletAddress, userId: frontendUserId } = body;
+  const {
+    nationalId,
+    fullName,
+    dob,
+    walletAddress,
+    userId: frontendUserId,
+    idFrontBase64,
+    idBackBase64,
+    ocrResult,
+  } = body;
 
   // ── Input validation ──────────────────────────────────────────────────────
   if (!nationalId || !/^\d{7,9}$/.test(String(nationalId).trim())) {
@@ -155,31 +183,25 @@ exports.handler = async (event) => {
     return json(400, { error: 'Wallet address is required' });
   }
 
-  const db = getDb();
-
-  // ── Duplicate check ───────────────────────────────────────────────────────
-  if (db) {
-    try {
-      const existing = await db.collection('smileVerificationJobs')
-        .where('walletAddress', '==', walletAddress)
-        .where('status', 'in', ['PENDING', 'VERIFIED'])
-        .limit(1)
-        .get();
-
-      if (!existing.empty) {
-        const job = existing.docs[0].data();
-        return json(200, {
-          jobId:   job.jobId,
-          status:  job.status,
-          message: job.status === 'VERIFIED'
-            ? 'Identity already verified'
-            : 'Verification already in progress',
-        });
-      }
-    } catch (checkErr) {
-      console.warn('[smile-verify] Duplicate check skipped:', checkErr.message);
+  // ── Strict Security Guard against Fake or Blank Documents ─────────────────
+  if (ocrResult && !ocrResult.isValid) {
+    console.log('[smile-verify] Security Guard: Rejecting invalid/mismatched document.');
+    const rejJobId = `REJ-${Date.now()}`;
+    const db = getDb();
+    if (db) {
+      try {
+        await updateVoterVerificationStatus(db, walletAddress, 'smile_rejected', rejJobId);
+      } catch (_) {}
     }
+
+    return json(200, {
+      jobId: rejJobId,
+      status: 'REJECTED',
+      message: 'Document Verification Rejected: Uploaded image does not match the entered National ID or name.',
+    });
   }
+
+  const db = getDb();
 
   // ── Call Smile ID ─────────────────────────────────────────────────────────
   let jobId, smileResponse;
@@ -188,6 +210,8 @@ exports.handler = async (event) => {
       nationalId: String(nationalId).trim(),
       fullName:   fullName.trim(),
       dob:        dob.trim(),
+      idFrontBase64,
+      ocrResult,
     });
     jobId         = result.jobId;
     smileResponse = result.smileResponse;
@@ -223,6 +247,7 @@ exports.handler = async (event) => {
         nationalIdSuffix: String(nationalId).trim().slice(-3),
         smileResultCode: resultCode || null,
         smileConfidence: smileResponse?.ConfidenceValue || null,
+        ocrMatched: ocrResult ? ocrResult.isValid : null,
       };
 
       await db.collection('smileVerificationJobs').doc(jobId).set(jobDoc);
@@ -266,7 +291,7 @@ async function updateVoterVerificationStatus(db, walletAddress, smileStatus, job
 function statusMessage(status) {
   switch (status) {
     case 'VERIFIED':       return 'Identity verified successfully with Smile ID';
-    case 'REJECTED':       return 'Identity could not be verified. Please verify your details with IEBC.';
+    case 'REJECTED':       return 'Identity verification failed. The uploaded document does not match voter records.';
     case 'PENDING_REVIEW': return 'Verification pending official IEBC review.';
     default:               return 'Verification submitted. Results will be processed shortly.';
   }

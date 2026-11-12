@@ -4,12 +4,10 @@
  * Allows voters to verify their vote was recorded on the blockchain
  * and included in the election tally, without revealing their candidate choice.
  */
-import React, { useState, useEffect, useCallback } from 'react';
-import { ethers } from 'ethers';
+import React, { useState, useEffect } from 'react';
 import { findReceiptByVerificationId, findReceiptByTransactionHash, incrementVerificationCount } from '../services/voteReceiptService';
 import { verifyTransaction, verifyVoteInTally } from '../services/blockchainVerificationService';
 import { downloadReceiptPDF, generateQRCodeDataUrl } from '../utils/pdfReceiptGenerator';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../config/contract';
 
 // Verification Timeline Step Component
 const TimelineStep = ({ icon, label, status, detail, isLast }) => {
@@ -124,6 +122,7 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
     checkHashParams();
     window.addEventListener('hashchange', checkHashParams);
     return () => window.removeEventListener('hashchange', checkHashParams);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateTimeline = (id, status, detail = '') => {

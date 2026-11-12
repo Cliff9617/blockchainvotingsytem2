@@ -32,16 +32,10 @@ import serializeBigInt from '../utils/serializeBigInt';
 import {
   ROLES,
   APP_ROLES,
-  CONTRACT_TO_APP_ROLES,
-  PERMISSIONS,
   ROLE_JURISDICTION,
   JURISDICTION,
-  ROLE_HIERARCHY_LEVEL,
   getPermissionsForRole,
-  getContractRoleFromAppRole,
   getAppRolesFromContractRole,
-  hasJurisdictionOver,
-  getRoleLevel,
 } from '../config/permissions';
 
 // ==========================================
@@ -123,14 +117,6 @@ const usePermissions = (contract, account) => {
       const userJurisdiction = primaryRole 
         ? (ROLE_JURISDICTION[primaryRole] || JURISDICTION.NONE)
         : JURISDICTION.NONE;
-
-      // Store county/constituency/ward from the contract
-      const userJurisdictionData = {
-        county: userRoleData.county || '',
-        constituency: userRoleData.constituency || '',
-        ward: userRoleData.ward || '',
-        active: Boolean(userRoleData.active),
-      };
 
       setRole(roleIndex);
       setAppRoles(matchedAppRoles);

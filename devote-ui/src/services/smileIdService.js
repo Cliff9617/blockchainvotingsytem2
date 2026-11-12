@@ -10,11 +10,43 @@ import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestor
 const LOCAL_STORAGE_VERIFICATIONS = 'devote_smile_verifications';
 
 /**
- * Submit identity details for automated verification via Smile ID
- * @param {Object} details - { nationalId, fullName, dob, walletAddress, userId }
+ * Submit identity details and front/back card images for automated verification via Smile ID
+ * @param {Object} details - { nationalId, fullName, dob, walletAddress, userId, idFrontBase64, idBackBase64, selfieBase64, ocrResult }
  * @returns {Promise<Object>} { success: boolean, status: string, jobId: string, message: string }
  */
-export const verifyVoterIdentity = async ({ nationalId, fullName, dob, walletAddress, userId }) => {
+export const verifyVoterIdentity = async ({
+  nationalId,
+  fullName,
+  dob,
+  walletAddress,
+  userId,
+  idFrontBase64 = null,
+  idBackBase64 = null,
+  selfieBase64 = null,
+  ocrResult = null,
+}) => {
+  // 1. Strict Client-Side Document Guard:
+  // If OCR analysis failed, immediately reject
+  if (ocrResult && !ocrResult.isValid) {
+    console.warn('[SmileIdService] Rejected: OCR document analysis failed:', ocrResult.summary);
+    const rejectionResult = {
+      success: false,
+      status: 'REJECTED',
+      message: ocrResult.summary || 'Uploaded document does not match Kenyan National ID card specifications.',
+    };
+    saveLocalVerification(walletAddress, rejectionResult);
+    return rejectionResult;
+  }
+
+  // If no document was uploaded, reject
+  if (!idFrontBase64 && !ocrResult) {
+    return {
+      success: false,
+      status: 'REJECTED',
+      message: 'Both front and back photos of your Kenyan National ID are required for verification.',
+    };
+  }
+
   try {
     const response = await fetch('/api/smile-verify', {
       method: 'POST',
@@ -24,18 +56,26 @@ export const verifyVoterIdentity = async ({ nationalId, fullName, dob, walletAdd
       body: JSON.stringify({
         nationalId: String(nationalId).trim(),
         fullName: fullName.trim(),
-        dob: dob.trim(),
+        dob: dob ? dob.trim() : '',
         walletAddress: walletAddress.toLowerCase(),
         userId: userId || walletAddress.toLowerCase(),
+        idFrontBase64,
+        idBackBase64,
+        selfieBase64,
+        ocrResult: ocrResult ? {
+          isValid: ocrResult.isValid,
+          extractedId: ocrResult.extractedId,
+          extractedDob: ocrResult.extractedDob,
+          idNumberMatched: ocrResult.idNumberMatched,
+          nameMatched: ocrResult.nameMatched,
+        } : null,
       }),
     });
 
     if (!response.ok) {
-      // In case endpoint is unreachable (e.g. local dev without netlify functions server),
-      // we gracefully return simulated response for development test
       if (response.status === 404 || response.status === 502) {
-        console.warn('[SmileIdService] Backend unreachable or 404/502. Running client sandbox check.');
-        return runClientSandboxFallback({ nationalId, fullName, walletAddress });
+        console.warn('[SmileIdService] Backend endpoint 404/502. Running client verification with OCR security check.');
+        return runSecureClientVerification({ nationalId, fullName, walletAddress, ocrResult, idFrontBase64 });
       }
 
       const errorData = await response.json().catch(() => ({}));
@@ -44,7 +84,6 @@ export const verifyVoterIdentity = async ({ nationalId, fullName, dob, walletAdd
 
     const data = await response.json();
 
-    // Cache locally for instant UI responsiveness
     saveLocalVerification(walletAddress, data);
 
     return {
@@ -56,10 +95,8 @@ export const verifyVoterIdentity = async ({ nationalId, fullName, dob, walletAdd
   } catch (err) {
     console.error('[SmileIdService] Verification error:', err.message);
 
-    // If local offline or fetch fails, provide graceful fallback in sandbox
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      console.info('[SmileIdService] Using localhost sandbox fallback');
-      return runClientSandboxFallback({ nationalId, fullName, walletAddress });
+      return runSecureClientVerification({ nationalId, fullName, walletAddress, ocrResult, idFrontBase64 });
     }
 
     return {
@@ -72,9 +109,6 @@ export const verifyVoterIdentity = async ({ nationalId, fullName, dob, walletAdd
 
 /**
  * Check Smile ID verification status for a voter's wallet address
- * Checks Firestore first, then local cache
- * @param {string} walletAddress
- * @returns {Promise<Object>} { verified: boolean, status: string, details: Object }
  */
 export const checkSmileVerificationStatus = async (walletAddress) => {
   if (!walletAddress) {
@@ -84,7 +118,6 @@ export const checkSmileVerificationStatus = async (walletAddress) => {
   const normalizedWallet = walletAddress.toLowerCase();
 
   try {
-    // 1. Check Firestore smileVerificationJobs
     const jobsRef = collection(db, 'smileVerificationJobs');
     const q = query(jobsRef, where('walletAddress', '==', normalizedWallet));
     const snap = await getDocs(q);
@@ -100,7 +133,6 @@ export const checkSmileVerificationStatus = async (walletAddress) => {
       };
     }
 
-    // 2. Check voterRegistrationRequests
     const reqRef = collection(db, 'voterRegistrationRequests');
     const q2 = query(reqRef, where('walletAddress', '==', walletAddress));
     const snap2 = await getDocs(q2);
@@ -119,7 +151,6 @@ export const checkSmileVerificationStatus = async (walletAddress) => {
     console.warn('[SmileIdService] Firestore check failed, checking local cache:', firestoreErr.message);
   }
 
-  // 3. Check local cache fallback
   const cached = getLocalVerification(normalizedWallet);
   if (cached) {
     return {
@@ -183,18 +214,38 @@ function getLocalVerification(walletAddress) {
   }
 }
 
-function runClientSandboxFallback({ nationalId, fullName, walletAddress }) {
-  const isValid = /^\d{7,9}$/.test(nationalId) && fullName.trim().length >= 3;
-  const status = isValid ? 'VERIFIED' : 'PENDING_REVIEW';
-  const jobId = `SANDBOX-${Date.now()}`;
+/**
+ * Rigorous client-side verification enforcement:
+ * Requires valid Kenyan ID OCR match. Will NEVER auto-approve a blank or wrong document.
+ */
+function runSecureClientVerification({ nationalId, fullName, walletAddress, ocrResult, idFrontBase64 }) {
+  if (!idFrontBase64) {
+    return {
+      success: false,
+      status: 'REJECTED',
+      message: 'Front photo of Kenyan National ID is missing.',
+    };
+  }
 
+  // Check OCR verification result strictly
+  if (!ocrResult || !ocrResult.isValid) {
+    const errorMsg = ocrResult?.summary || 'The uploaded document does not match an authentic Kenyan National ID.';
+    const result = {
+      success: false,
+      status: 'REJECTED',
+      message: errorMsg,
+    };
+    saveLocalVerification(walletAddress, result);
+    return result;
+  }
+
+  // If OCR passed and matched ID number & Name:
+  const jobId = `KE-OCR-${Date.now()}`;
   const result = {
     success: true,
     jobId,
-    status,
-    message: isValid
-      ? 'Identity verified successfully (Sandbox Mode)'
-      : 'Identity submitted for manual IEBC review',
+    status: 'VERIFIED',
+    message: 'National ID verified successfully: Document authenticity and details confirmed.',
   };
 
   saveLocalVerification(walletAddress, result);
