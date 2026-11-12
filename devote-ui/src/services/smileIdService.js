@@ -48,11 +48,15 @@ export const verifyVoterIdentity = async ({
   }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     const response = await fetch('/api/smile-verify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         nationalId: String(nationalId).trim(),
         fullName: fullName.trim(),
@@ -71,6 +75,8 @@ export const verifyVoterIdentity = async ({
         } : null,
       }),
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       if (response.status === 404 || response.status === 502) {
