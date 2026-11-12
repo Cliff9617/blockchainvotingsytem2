@@ -161,15 +161,15 @@ const useElection = (contract, account, isSuperAdmin) => {
         contract.electionEnded(),
       ]);
       
-      console.log('[useElection] 📊 electionStarted():', started);
-      console.log('[useElection] 📊 electionEnded():', ended);
+      console.log('[useElection]  electionStarted():', started);
+      console.log('[useElection]  electionEnded():', ended);
       
       // Read owner and role info for diagnostic
       try {
         const owner = await contract.owner();
-        console.log('[useElection] 📊 owner():', owner);
+        console.log('[useElection]  owner():', owner);
       } catch (e) {
-        console.log('[useElection] ⚠️ Could not read owner():', e.message);
+        console.log('[useElection]  Could not read owner():', e.message);
       }
       
       // Admin detection is handled by useAdmin hook (called from App.js)
@@ -441,13 +441,13 @@ const useElection = (contract, account, isSuperAdmin) => {
       throw new Error("No wallet connected. Please connect your wallet.");
     }
     if (isSuperAdmin !== true) {
-      console.error('[useElection] 🚫 SUPER ADMIN AUTHORIZATION FAILED');
-      console.error('[useElection] 🚫 Account:', account);
-      console.error('[useElection] 🚫 isSuperAdmin:', isSuperAdmin);
-      console.error('[useElection] 🚫 Only the Super Admin can perform this action.');
+      console.error('[useElection]  SUPER ADMIN AUTHORIZATION FAILED');
+      console.error('[useElection]  Account:', account);
+      console.error('[useElection]  isSuperAdmin:', isSuperAdmin);
+      console.error('[useElection]  Only the Super Admin can perform this action.');
       throw new Error(SUPER_ADMIN_ONLY_MSG);
     }
-    console.log('[useElection] ✅ Super Admin authorization passed for account:', account);
+    console.log('[useElection]  Super Admin authorization passed for account:', account);
   }, [account, isSuperAdmin]);
 
   // ============================================================================
@@ -562,7 +562,7 @@ const useElection = (contract, account, isSuperAdmin) => {
     console.log('[useElection] Setting up event listeners...');
 
     const handleElectionStarted = (electionId) => {
-      console.log('[useElection] 🎯 ElectionStarted event received! electionId:', electionId.toString());
+      console.log('[useElection]  ElectionStarted event received! electionId:', electionId.toString());
       // Immediately reload election data
       loadElectionData();
       if (account) {
@@ -571,7 +571,7 @@ const useElection = (contract, account, isSuperAdmin) => {
     };
 
     const handleElectionEnded = (electionId) => {
-      console.log('[useElection] 🎯 ElectionEnded event received! electionId:', electionId.toString());
+      console.log('[useElection]  ElectionEnded event received! electionId:', electionId.toString());
       // Immediately reload election data
       loadElectionData();
       if (account) {
@@ -580,7 +580,7 @@ const useElection = (contract, account, isSuperAdmin) => {
     };
 
     const handleMultiSigProposalExecuted = (proposalId) => {
-      console.log('[useElection] 🎯 MultiSigProposalExecuted event received! proposalId:', proposalId.toString());
+      console.log('[useElection]  MultiSigProposalExecuted event received! proposalId:', proposalId.toString());
       // Immediately reload election data
       loadElectionData();
       if (account) {
@@ -589,7 +589,7 @@ const useElection = (contract, account, isSuperAdmin) => {
     };
 
     const handleVoterRegistered = (voter) => {
-      console.log('[useElection] 🎯 VoterRegistered event received! voter:', voter);
+      console.log('[useElection]  VoterRegistered event received! voter:', voter);
       // Reload voter info if it matches the current account
       if (account && voter.toLowerCase() === account.toLowerCase()) {
         checkVoterInfo(account);
@@ -597,7 +597,7 @@ const useElection = (contract, account, isSuperAdmin) => {
     };
 
     const handleVoteCast = (voteToken, position) => {
-      console.log('[useElection] 🎯 VoteCast event received!');
+      console.log('[useElection]  VoteCast event received!');
       // Reload election data to update vote counts
       loadElectionData();
       if (account) {
@@ -613,9 +613,9 @@ const useElection = (contract, account, isSuperAdmin) => {
       contract.on('VoterRegistered', handleVoterRegistered);
       contract.on('VoteCast', handleVoteCast);
       
-      console.log('[useElection] ✅ Event listeners registered successfully');
+      console.log('[useElection]  Event listeners registered successfully');
     } catch (err) {
-      console.warn('[useElection] ⚠️ Could not register event listeners:', err.message);
+      console.warn('[useElection]  Could not register event listeners:', err.message);
     }
 
     return () => {
@@ -626,9 +626,9 @@ const useElection = (contract, account, isSuperAdmin) => {
         contract.off('MultiSigProposalExecuted', handleMultiSigProposalExecuted);
         contract.off('VoterRegistered', handleVoterRegistered);
         contract.off('VoteCast', handleVoteCast);
-        console.log('[useElection] ✅ Event listeners cleaned up');
+        console.log('[useElection]  Event listeners cleaned up');
       } catch (err) {
-        console.warn('[useElection] ⚠️ Could not cleanup event listeners:', err.message);
+        console.warn('[useElection]  Could not cleanup event listeners:', err.message);
       }
     };
   }, [contract, account, loadElectionData, checkVoterInfo]);
@@ -659,17 +659,17 @@ const useElection = (contract, account, isSuperAdmin) => {
     setActionStatus("Starting election...");
 
     try {
-      console.log('[useElection] 🚀 Calling contract.startElection() directly...');
+      console.log('[useElection]  Calling contract.startElection() directly...');
       console.log('[useElection] Contract target:', contract.target);
       console.log('[useElection] Contract runner:', contract.runner?.address);
       
       // Call the public startElection() function directly
       // This bypasses the multi-sig system for Super Admin authority
       const tx = await contract.startElection();
-      console.log('[useElection] ✅ Transaction sent, hash:', tx.hash);
+      console.log('[useElection]  Transaction sent, hash:', tx.hash);
       
       const receipt = await tx.wait();
-      console.log('[useElection] ✅ Transaction mined');
+      console.log('[useElection]  Transaction mined');
       console.log('[useElection] Receipt status:', receipt.status);
       console.log('[useElection] Receipt blockNumber:', receipt.blockNumber);
       
@@ -685,7 +685,7 @@ const useElection = (contract, account, isSuperAdmin) => {
       
       // Verify election started by reading directly from blockchain
       const started = await contract.electionStarted();
-      console.log('[useElection] ✅ Blockchain electionStarted:', started);
+      console.log('[useElection]  Blockchain electionStarted:', started);
       
       if (started) {
         return { success: true, message: "Election started successfully." };
@@ -711,16 +711,16 @@ const useElection = (contract, account, isSuperAdmin) => {
     setActionStatus("Ending election...");
 
     try {
-      console.log('[useElection] 🚀 Calling contract.endElection() directly...');
+      console.log('[useElection]  Calling contract.endElection() directly...');
       console.log('[useElection] Contract target:', contract.target);
       console.log('[useElection] Contract runner:', contract.runner?.address);
       
       // Call the public endElection() function directly
       const tx = await contract.endElection();
-      console.log('[useElection] ✅ Transaction sent, hash:', tx.hash);
+      console.log('[useElection]  Transaction sent, hash:', tx.hash);
       
       const receipt = await tx.wait();
-      console.log('[useElection] ✅ Transaction mined');
+      console.log('[useElection]  Transaction mined');
       console.log('[useElection] Receipt status:', receipt.status);
       console.log('[useElection] Receipt blockNumber:', receipt.blockNumber);
       
@@ -736,7 +736,7 @@ const useElection = (contract, account, isSuperAdmin) => {
       
       // Verify election ended by reading directly from blockchain
       const ended = await contract.electionEnded();
-      console.log('[useElection] ✅ Blockchain electionEnded:', ended);
+      console.log('[useElection]  Blockchain electionEnded:', ended);
       
       if (ended) {
         return { success: true, message: "Election ended successfully." };
@@ -766,12 +766,12 @@ const useElection = (contract, account, isSuperAdmin) => {
       if (candidate && voterLocation) {
         const jurisdictionCheck = validateCandidateJurisdiction(candidate, voterLocation);
         if (!jurisdictionCheck.valid) {
-          console.error('[useElection] 🚫 Jurisdiction validation failed:', jurisdictionCheck.error);
+          console.error('[useElection]  Jurisdiction validation failed:', jurisdictionCheck.error);
           // Do NOT prompt MetaMask
           // Do NOT send a blockchain transaction
           throw new Error(jurisdictionCheck.error);
         }
-        console.log('[useElection] ✅ Jurisdiction validation passed');
+        console.log('[useElection]  Jurisdiction validation passed');
       }
       
       const result = await runAction(

@@ -8,14 +8,26 @@ import React, { useState, useEffect } from 'react';
 import { findReceiptByVerificationId, findReceiptByTransactionHash, incrementVerificationCount } from '../services/voteReceiptService';
 import { verifyTransaction, verifyVoteInTally } from '../services/blockchainVerificationService';
 import { downloadReceiptPDF, generateQRCodeDataUrl } from '../utils/pdfReceiptGenerator';
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  XCircleIcon,
+  AlertTriangleIcon,
+  BallotBoxIcon,
+  CheckIcon,
+  SearchIcon,
+  ReceiptIcon,
+  LinkIcon,
+  LockIcon,
+} from '../components/common/Icons';
+import Navbar from '../components/Navbar';
 
 // Verification Timeline Step Component
-const TimelineStep = ({ icon, label, status, detail, isLast }) => {
+const TimelineStep = ({ label, status, detail, isLast }) => {
   const getStatusIcon = () => {
-    if (status === 'success') return '✅';
-    if (status === 'loading') return '⏳';
-    if (status === 'error') return '❌';
-    return '⏳';
+    if (status === 'success') return <CheckCircleIcon className="w-5 h-5 text-green-600" />;
+    if (status === 'error') return <XCircleIcon className="w-5 h-5 text-red-500" />;
+    return <ClockIcon className="w-5 h-5 text-gray-400" />;
   };
 
   const getStatusColor = () => {
@@ -30,7 +42,7 @@ const TimelineStep = ({ icon, label, status, detail, isLast }) => {
       {!isLast && (
         <div className="absolute left-5 top-10 bottom-0 w-0.5 bg-gray-200" />
       )}
-      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 ${getStatusColor()}`}>
+      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${getStatusColor()}`}>
         {getStatusIcon()}
       </div>
       <div className="flex-1 min-w-0">
@@ -45,12 +57,12 @@ const TimelineStep = ({ icon, label, status, detail, isLast }) => {
 
 // Blockchain Badge Component
 const BlockchainBadge = ({ verified }) => (
-  <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-    verified 
-      ? 'bg-green-100 text-green-800 border border-green-200' 
-      : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${
+    verified
+      ? 'bg-green-100 text-green-800'
+      : 'bg-yellow-100 text-yellow-800'
   }`}>
-    <span className="mr-1">{verified ? '🟢' : '🟡'}</span>
+    <span className={`w-1.5 h-1.5 rounded-full ${verified ? 'bg-green-600' : 'bg-yellow-500'}`}></span>
     {verified ? 'Verified on Blockchain' : 'Pending Verification'}
   </div>
 );
@@ -85,7 +97,7 @@ const getHashParam = (param) => {
   }
 };
 
-const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
+const VerifyVotePage = ({ account, contract, isConnected, electionEnded, onConnectWallet, onNavigate }) => {
   // Search mode
   const [searchMode, setSearchMode] = useState('id');
   const [searchValue, setSearchValue] = useState('');
@@ -261,7 +273,13 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gray-50">
+      <Navbar
+        onConnectWallet={onConnectWallet}
+        isConnected={isConnected}
+        account={account}
+        onNavigate={onNavigate}
+      />
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -344,7 +362,7 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
           {error && (
             <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="flex items-start space-x-3">
-                <span className="text-red-500 text-lg">⚠️</span>
+                <AlertTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-red-700 font-medium">Verification Failed</p>
                   <p className="text-red-600 text-sm mt-1">{error}</p>
@@ -384,8 +402,10 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
                 : 'bg-gradient-to-r from-yellow-500 to-yellow-600'
             } text-white shadow-lg`}>
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <span className="text-3xl">{verificationResult.overall ? '✅' : '⚠️'}</span>
+                <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  {verificationResult.overall
+                    ? <CheckCircleIcon className="w-8 h-8 text-white" />
+                    : <AlertTriangleIcon className="w-8 h-8 text-white" />}
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">
@@ -458,10 +478,10 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
                       <p className="text-xs text-gray-500 mb-1">Vote Count Status</p>
                       <p className="text-sm font-semibold text-gray-800">
                         {verificationResult.tally.finalized
-                          ? '✅ Included in final count'
+                          ? 'Included in final count'
                           : verificationResult.tally.verified
-                            ? '✅ Recorded in active election'
-                            : '❌ Not found in tally'}
+                            ? 'Recorded in active election'
+                            : 'Not found in tally'}
                       </p>
                     </div>
                   )}
@@ -488,12 +508,13 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
             {electionEnded && verificationResult.tally?.finalized && (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-6 mb-8">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">🗳️</span>
+                  <div className="w-11 h-11 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <BallotBoxIcon className="w-6 h-6 text-green-700" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-green-800">
-                      ✓ Your vote has been included in the final vote count.
+                    <h3 className="text-lg font-bold text-green-800 flex items-center gap-1.5">
+                      <CheckIcon className="w-4 h-4" />
+                      Your vote has been included in the final vote count.
                     </h3>
                     <p className="text-green-700 text-sm mt-1">
                       Your vote was successfully counted in the official election results.
@@ -541,7 +562,7 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
 
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-8">
               <div className="flex items-start space-x-3">
-                <span className="text-blue-500 text-lg">🔒</span>
+                <LockIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-blue-800 font-semibold text-sm">Anonymous Verification</p>
                   <p className="text-blue-700 text-xs mt-1">
@@ -556,18 +577,26 @@ const VerifyVotePage = ({ account, contract, isConnected, electionEnded }) => {
 
         {!verificationResult && !isVerifying && !error && (
           <div className="text-center py-12">
-            <div className="text-6xl mb-4">🔍</div>
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <SearchIcon className="w-8 h-8 text-gray-300" />
+            </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Verify Your Vote</h3>
             <p className="text-gray-600 max-w-md mx-auto">
               Enter your Vote Verification ID or Transaction Hash above to verify that your vote was securely recorded on the blockchain.
             </p>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-lg mx-auto">
               <div className="bg-white rounded-xl border border-gray-200 p-4 text-left">
-                <p className="text-sm font-semibold text-gray-900 mb-1">🔐 Vote Verification ID</p>
+                <p className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-1.5">
+                  <ReceiptIcon className="w-4 h-4 text-gray-500" />
+                  Vote Verification ID
+                </p>
                 <p className="text-xs text-gray-600">Found on your vote receipt after casting your vote.</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 text-left">
-                <p className="text-sm font-semibold text-gray-900 mb-1">⛓️ Transaction Hash</p>
+                <p className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-1.5">
+                  <LinkIcon className="w-4 h-4 text-gray-500" />
+                  Transaction Hash
+                </p>
                 <p className="text-xs text-gray-600">The blockchain transaction hash from your vote transaction.</p>
               </div>
             </div>

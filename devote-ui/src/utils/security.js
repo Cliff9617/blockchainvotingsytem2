@@ -506,7 +506,7 @@ export const validatePassword = (password) => {
 /**
  * Hash password using browser crypto API (SHA-256)
  * 
- * ⚠️ IMPORTANT: This is for frontend demo-level password handling only.
+ *  IMPORTANT: This is for frontend demo-level password handling only.
  * Real production password hashing MUST be handled server-side with proper
  * password hashing algorithms like bcrypt, scrypt, or argon2.
  * SHA-256 is NOT suitable for password storage in production as it's

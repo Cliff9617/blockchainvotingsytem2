@@ -1,5 +1,13 @@
 import React from 'react';
 import { isMetaMaskInstalled } from '../utils/connectWallet';
+import { AlertTriangleIcon, PhoneIcon } from './common/Icons';
+
+// Minimal wallet glyph (MetaMask-style fox silhouette abstracted)
+const WalletIcon = ({ className = 'w-6 h-6' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+  </svg>
+);
 
 // Mobile detection
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -38,8 +46,8 @@ const WalletConnect = ({
     <div className="bg-white rounded-xl shadow-soft border border-gray-100 p-6 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
-            <span className="text-white text-xl font-bold">🦊</span>
+          <div className="w-12 h-12 bg-dark-green-600 rounded-xl flex items-center justify-center shadow-lg text-white">
+            <WalletIcon className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Wallet Connection</h2>
@@ -51,8 +59,9 @@ const WalletConnect = ({
 
         <div className="flex flex-col items-end space-y-2">
           {networkError && (
-            <div className="px-4 py-2 bg-red-50 text-red-800 text-sm rounded-lg border border-red-200 max-w-xs text-center">
-              <span className="font-medium">⚠️ {networkError}</span>
+            <div className="px-4 py-2 bg-red-50 text-red-800 text-sm rounded-lg border border-red-200 max-w-xs text-center flex items-center gap-2">
+              <AlertTriangleIcon className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">{networkError}</span>
             </div>
           )}
           
@@ -88,7 +97,7 @@ const WalletConnect = ({
                 </div>
               ) : (
                 <span className="flex items-center space-x-2">
-                  <span>🦊</span>
+                  <WalletIcon className="w-5 h-5" />
                   <span>Connect MetaMask</span>
                 </span>
               )}
@@ -101,7 +110,7 @@ const WalletConnect = ({
       {showMetaMaskWarning && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-start space-x-3">
-            <span className="text-yellow-600 text-xl">⚠️</span>
+            <AlertTriangleIcon className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div>
               <h4 className="font-medium text-yellow-800">MetaMask Not Detected</h4>
               <p className="text-sm text-yellow-700 mt-1">
@@ -136,7 +145,10 @@ const WalletConnect = ({
       {/* Mobile instructions */}
       {isMobileWithoutEthereum && (
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="font-medium text-blue-800 mb-2">📱 Mobile Users:</h4>
+          <h4 className="font-medium text-blue-800 mb-2 flex items-center gap-2">
+            <PhoneIcon className="w-4 h-4" />
+            Mobile Users:
+          </h4>
           <ol className="text-sm text-blue-700 space-y-1">
             <li>1. Make sure you have MetaMask app installed</li>
             <li>2. Click "Connect MetaMask" button below</li>

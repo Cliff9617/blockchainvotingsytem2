@@ -30,7 +30,7 @@ const BulkVoterUpload = ({ isLoading = false, onUpload }) => {
     try {
       setStatus('Uploading voter list...');
       await onUpload(file);
-      setStatus('✅ File uploaded successfully');
+      setStatus('File uploaded successfully');
       resetFileInput();
     } catch (err) {
       console.error(err);
@@ -102,7 +102,7 @@ const BulkVoterUpload = ({ isLoading = false, onUpload }) => {
         {status && (
           <div
             className={`p-4 rounded-xl border-2 ${
-              status.startsWith('✅')
+              status.startsWith('File uploaded')
                 ? 'bg-green-50 border-green-200 text-green-800'
                 : status.startsWith('Error')
                 ? 'bg-red-50 border-red-200 text-red-800'

@@ -30,17 +30,17 @@ class PermissionGuard {
    */
   verify(requiredPermission, userPermissions, actionName) {
     if (!userPermissions) {
-      console.error(`[PermissionGuard] 🚫 ${actionName} blocked: No permissions loaded`);
+      console.error(`[PermissionGuard]  ${actionName} blocked: No permissions loaded`);
       throw new Error(`Access denied: You do not have permission to ${actionName}. Permissions not loaded.`);
     }
 
     if (userPermissions[requiredPermission] !== true) {
-      console.error(`[PermissionGuard] 🚫 ${actionName} blocked: Missing permission "${requiredPermission}"`);
+      console.error(`[PermissionGuard]  ${actionName} blocked: Missing permission "${requiredPermission}"`);
       console.error(`[PermissionGuard] User permissions:`, Object.keys(userPermissions).filter(k => userPermissions[k]));
       throw new Error(`Access denied: You do not have permission to ${actionName}. Required: ${requiredPermission}.`);
     }
 
-    console.log(`[PermissionGuard] ✅ ${actionName} authorized (permission: ${requiredPermission})`);
+    console.log(`[PermissionGuard]  ${actionName} authorized (permission: ${requiredPermission})`);
     return true;
   }
 
@@ -63,7 +63,7 @@ class PermissionGuard {
     // County jurisdiction: only their county
     if (userJurisdiction === 'county') {
       if (userCounty !== targetCounty) {
-        console.error(`[PermissionGuard] 🚫 ${actionName} blocked: County jurisdiction mismatch`);
+        console.error(`[PermissionGuard]  ${actionName} blocked: County jurisdiction mismatch`);
         throw new Error(`Access denied: You can only access data for your assigned county (${userCounty}).`);
       }
       return true;
@@ -72,7 +72,7 @@ class PermissionGuard {
     // Constituency jurisdiction: only their constituency
     if (userJurisdiction === 'constituency') {
       if (userConstituency !== targetConstituency) {
-        console.error(`[PermissionGuard] 🚫 ${actionName} blocked: Constituency jurisdiction mismatch`);
+        console.error(`[PermissionGuard]  ${actionName} blocked: Constituency jurisdiction mismatch`);
         throw new Error(`Access denied: You can only access data for your assigned constituency (${userConstituency}).`);
       }
       return true;
@@ -80,12 +80,12 @@ class PermissionGuard {
 
     // Polling station: limited scope
     if (userJurisdiction === 'polling_station') {
-      console.error(`[PermissionGuard] 🚫 ${actionName} blocked: Polling station scope too limited`);
+      console.error(`[PermissionGuard]  ${actionName} blocked: Polling station scope too limited`);
       throw new Error(`Access denied: Your role does not have jurisdiction over this area.`);
     }
 
     // No jurisdiction
-    console.error(`[PermissionGuard] 🚫 ${actionName} blocked: No jurisdiction (${userJurisdiction})`);
+    console.error(`[PermissionGuard]  ${actionName} blocked: No jurisdiction (${userJurisdiction})`);
     throw new Error(`Access denied: You do not have jurisdiction to ${actionName}.`);
   }
 
@@ -103,11 +103,11 @@ class PermissionGuard {
     }
 
     if (userRole < minimumRole) {
-      console.error(`[PermissionGuard] 🚫 ${actionName} blocked: Insufficient role level`);
+      console.error(`[PermissionGuard]  ${actionName} blocked: Insufficient role level`);
       throw new Error(`Access denied: Your role level (${userRole}) is insufficient to ${actionName}. Minimum required: ${minimumRole}.`);
     }
 
-    console.log(`[PermissionGuard] ✅ ${actionName} authorized (role: ${userRole} >= ${minimumRole})`);
+    console.log(`[PermissionGuard]  ${actionName} authorized (role: ${userRole} >= ${minimumRole})`);
     return true;
   }
 

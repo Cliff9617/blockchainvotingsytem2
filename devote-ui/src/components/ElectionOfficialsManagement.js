@@ -451,7 +451,7 @@ const ElectionOfficialsManagement = ({
         const result = await checkBlockchainRole(contract, formData.walletAddress);
         if (result.hasRole) {
           setBlockchainRoleWarning(
-            `⚠️ This wallet already has a blockchain role (Role #${result.role}). Assigning a new role will override it.`
+            `This wallet already has a blockchain role (Role #${result.role}). Assigning a new role will override it.`
           );
         } else {
           setBlockchainRoleWarning("");
@@ -507,14 +507,14 @@ const ElectionOfficialsManagement = ({
           console.warn("[Audit] Failed to log edit:", auditErr);
         }
 
-        showStatus(`✅ ${formData.fullName} updated successfully.`, "success");
+        showStatus(`${formData.fullName} updated successfully.`, "success");
       } else {
         // For creation, attempt blockchain assignment with tx tracking
         const blockchainSupported = supportsBlockchainRoleAssignment(contract);
 
         if (blockchainSupported && formData.walletAddress && account) {
           setTxStatus("waiting");
-          showStatus("⏳ Waiting for MetaMask confirmation...", "info");
+          showStatus("Waiting for MetaMask confirmation...", "info");
         }
 
         const result = await createOfficial(formData, contract, account);
@@ -522,16 +522,16 @@ const ElectionOfficialsManagement = ({
         if (result.blockchainTxHash) {
           setTxStatus("confirmed");
           setTxHash(result.blockchainTxHash);
-          showStatus(`✅ ${formData.fullName} created with blockchain role assignment. TX: ${truncateAddress(result.blockchainTxHash)}`, "success");
+          showStatus(`${formData.fullName} created with blockchain role assignment. TX: ${truncateAddress(result.blockchainTxHash)}`, "success");
         } else if (result.blockchainError && result.blockchainError.includes("not supported by the current deployed contract")) {
           setTxStatus(null);
-          showStatus(`✅ ${formData.fullName} created (Firestore only). Blockchain role assignment is not supported by the current deployed contract.`, "success");
+          showStatus(`${formData.fullName} created (Firestore only). Blockchain role assignment is not supported by the current deployed contract.`, "success");
         } else if (result.blockchainError) {
           setTxStatus("rejected");
-          showStatus(`✅ ${formData.fullName} created (Firestore only). Blockchain: ${result.blockchainError}`, "success");
+          showStatus(`${formData.fullName} created (Firestore only). Blockchain: ${result.blockchainError}`, "success");
         } else {
           setTxStatus(null);
-          showStatus(`✅ ${formData.fullName} created (Firestore only).`, "success");
+          showStatus(`${formData.fullName} created (Firestore only).`, "success");
         }
 
         // Create audit log for creation
@@ -559,7 +559,7 @@ const ElectionOfficialsManagement = ({
       resetForm();
     } catch (err) {
       setTxStatus("rejected");
-      showStatus(`❌ ${err.message}`, "error");
+      showStatus(`${err.message}`, "error");
     } finally {
       setSubmitting(false);
       if (!isEditing) {
@@ -598,9 +598,9 @@ const ElectionOfficialsManagement = ({
         console.warn("[Audit] Failed to log activation:", auditErr);
       }
 
-      showStatus(`✅ ${official.fullName} activated successfully.`, "success");
+      showStatus(`${official.fullName} activated successfully.`, "success");
     } catch (err) {
-      showStatus(`❌ ${err.message}`, "error");
+      showStatus(`${err.message}`, "error");
     }
   };
 
@@ -629,11 +629,11 @@ const ElectionOfficialsManagement = ({
         console.warn("[Audit] Failed to log suspension:", auditErr);
       }
 
-      showStatus(`✅ ${suspendingOfficial.fullName} suspended successfully.`, "success");
+      showStatus(`${suspendingOfficial.fullName} suspended successfully.`, "success");
       setShowSuspend(false);
       setSuspendingOfficial(null);
     } catch (err) {
-      showStatus(`❌ ${err.message}`, "error");
+      showStatus(`${err.message}`, "error");
     }
   };
 
@@ -662,11 +662,11 @@ const ElectionOfficialsManagement = ({
         console.warn("[Audit] Failed to log disable:", auditErr);
       }
 
-      showStatus(`✅ ${disablingOfficial.fullName} disabled successfully.`, "success");
+      showStatus(`${disablingOfficial.fullName} disabled successfully.`, "success");
       setShowDisable(false);
       setDisablingOfficial(null);
     } catch (err) {
-      showStatus(`❌ ${err.message}`, "error");
+      showStatus(`${err.message}`, "error");
     }
   };
 
@@ -695,11 +695,11 @@ const ElectionOfficialsManagement = ({
         console.warn("[Audit] Failed to log deletion:", auditErr);
       }
 
-      showStatus(`✅ ${deletingOfficial.fullName} removed successfully.`, "success");
+      showStatus(`${deletingOfficial.fullName} removed successfully.`, "success");
       setShowDelete(false);
       setDeletingOfficial(null);
     } catch (err) {
-      showStatus(`❌ ${err.message}`, "error");
+      showStatus(`${err.message}`, "error");
     }
   };
 
@@ -710,15 +710,15 @@ const ElectionOfficialsManagement = ({
     switch (format) {
       case "csv":
         exportToCsv(dataToExport);
-        showStatus("✅ CSV exported successfully.", "success");
+        showStatus("CSV exported successfully.", "success");
         break;
       case "excel":
         exportToExcel(dataToExport);
-        showStatus("✅ Excel exported successfully.", "success");
+        showStatus("Excel exported successfully.", "success");
         break;
       case "pdf":
         exportToPdf(dataToExport, "Election Officials Report");
-        showStatus("✅ PDF report opened.", "success");
+        showStatus("PDF report opened.", "success");
         break;
       default:
         break;

@@ -514,21 +514,21 @@ export const getSeverityConfig = (severity) => {
         bgColor: 'bg-red-100',
         textColor: 'text-red-800',
         borderColor: 'border-red-200',
-        icon: '🔴',
+        icon: '',
       };
     case 'medium':
       return {
         bgColor: 'bg-orange-100',
         textColor: 'text-orange-800',
         borderColor: 'border-orange-200',
-        icon: '🟠',
+        icon: '',
       };
     case 'low':
       return {
         bgColor: 'bg-yellow-100',
         textColor: 'text-yellow-800',
         borderColor: 'border-yellow-200',
-        icon: '🟡',
+        icon: '',
       };
     case 'info':
     default:
@@ -536,7 +536,7 @@ export const getSeverityConfig = (severity) => {
         bgColor: 'bg-blue-100',
         textColor: 'text-blue-800',
         borderColor: 'border-blue-200',
-        icon: 'ℹ️',
+        icon: '',
       };
   }
 };

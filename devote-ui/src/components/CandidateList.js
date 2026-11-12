@@ -1,5 +1,6 @@
 import React from "react";
 import CandidateCard from "./CandidateCard";
+import { UsersIcon } from "./common/Icons";
 
 const CandidateList = ({
   candidates = [],
@@ -14,7 +15,9 @@ const CandidateList = ({
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-soft border border-gray-100 p-8 text-center">
-        <div className="text-6xl mb-4">👥</div>
+        <div className="text-6xl mb-4">
+          <UsersIcon className="w-16 h-16 text-gray-300 mx-auto" />
+        </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
           No Candidates Yet
         </h3>

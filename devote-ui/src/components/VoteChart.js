@@ -137,7 +137,7 @@ const VoteChart = ({ candidates, electionEnded, totalVotes, getVotePercentage })
   if (candidates.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-soft border border-gray-100 p-8 text-center">
-        <div className="text-6xl mb-4">📊</div>
+        <div className="text-6xl mb-4"></div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">No Candidates Yet</h3>
         <p className="text-gray-600">
           {electionEnded 
@@ -241,23 +241,23 @@ const VoteChart = ({ candidates, electionEnded, totalVotes, getVotePercentage })
                     <td className="py-3 px-4 text-right">
                       {isWinner ? (
                         <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-full border border-yellow-200">
-                          🏆 Winner
+                           Winner
                         </span>
                       ) : isTiedWinner ? (
                         <span className="px-2 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full border border-purple-200">
-                          🤝 Tied Winner
+                           Tied Winner
                         </span>
                       ) : isLeading ? (
                         <span className="px-2 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full border border-blue-200">
-                          📈 Leading
+                           Leading
                         </span>
                       ) : isTiedLead ? (
                         <span className="px-2 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full border border-purple-200">
-                          📊 Tied Lead
+                           Tied Lead
                         </span>
                       ) : (
                         <span className="px-2 py-1 bg-gray-100 text-gray-800 text-sm font-medium rounded-full border border-gray-200">
-                          📉 Behind
+                           Behind
                         </span>
                       )}
                     </td>

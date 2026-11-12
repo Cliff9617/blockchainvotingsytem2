@@ -10,6 +10,7 @@ import {
   checkFacePosition,
 } from '../utils/faceDetection';
 import { verifyVoterIdentity } from '../services/smileIdService';
+import { ShieldCheckIcon, ClockIcon } from '../components/common/Icons';
 import { runOcrOnImage, verifyKenyanIdDocument } from '../utils/kenyanIdOcr';
 import { compressAndResizeImage } from '../utils/imageOptimizer';
 
@@ -1110,7 +1111,7 @@ const RegistrationPage = ({
                   <p className="mt-1 text-sm text-gray-500">Please select a county first</p>
                 )}
                 {votingArea.county && dataLoadingError && (
-                  <p className="mt-1 text-sm text-yellow-600">⚠️ No constituencies found for selected county. Please try a different county or contact support.</p>
+                  <p className="mt-1 text-sm text-yellow-600">No constituencies found for selected county. Please try a different county or contact support.</p>
                 )}
                 {votingArea.county && constituencies.length === 0 && !dataLoadingError && (
                   <p className="mt-1 text-sm text-gray-500">Loading constituencies...</p>
@@ -1533,11 +1534,11 @@ const RegistrationPage = ({
               {smileVerificationState?.isVerified ? 'Identity Verified & Registered' : 'Registration Staged for Review'}
             </h2>
 
-            {/* Smile ID Verification Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-4 bg-gray-100 text-gray-800 border border-gray-200">
-              <span className={`w-2 h-2 rounded-full ${
-                smileVerificationState?.isVerified ? 'bg-green-500' : 'bg-yellow-500'
-              }`}></span>
+            {/* Verification Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-semibold mb-4 bg-gray-100 text-gray-800">
+              {smileVerificationState?.isVerified
+                ? <ShieldCheckIcon className="w-4 h-4 text-green-600" />
+                : <ClockIcon className="w-4 h-4 text-yellow-600" />}
               Smile ID: {smileVerificationState?.isVerified ? 'Automated KYC Verified' : 'Manual Review Staged'}
             </div>
 

@@ -46,17 +46,17 @@ const useAdmin = (contract, account) => {
   const performAdminCheck = useCallback(async () => {
     // Prevent concurrent checks
     if (isCheckInProgressRef.current) {
-      console.log("[useAdmin] ⏳ Admin check already in progress, skipping...");
+      console.log("[useAdmin]  Admin check already in progress, skipping...");
       return false;
     }
 
-    console.log("[useAdmin] 🔍 Starting admin status check...");
-    console.log("[useAdmin] 📋 Contract instance exists:", !!contract);
-    console.log("[useAdmin] 📋 Connected account:", account);
+    console.log("[useAdmin]  Starting admin status check...");
+    console.log("[useAdmin]  Contract instance exists:", !!contract);
+    console.log("[useAdmin]  Connected account:", account);
 
     // If no contract or account, wait
     if (!contract || !account) {
-      console.log("[useAdmin] ⏳ Waiting for contract or account to be available...");
+      console.log("[useAdmin]  Waiting for contract or account to be available...");
       return false;
     }
 
@@ -66,21 +66,21 @@ const useAdmin = (contract, account) => {
     setError("");
 
     try {
-      console.log("[useAdmin] 📞 Checking admin via getUserRole()...");
+      console.log("[useAdmin]  Checking admin via getUserRole()...");
       
       // Use getUserRole() which IS in the deployed ABI
       // This returns: (role, county, constituency, ward, active, assignedAt, assignedBy)
       const roleData = await contract.getUserRole(account);
       const roleIndex = Number(roleData.role);
       
-      console.log("[useAdmin] ✅ Raw role data:", serializeBigInt(roleData));
-      console.log("[useAdmin] ✅ Role index:", roleIndex);
-      console.log("[useAdmin] ✅ Role active:", roleData.active);
+      console.log("[useAdmin]  Raw role data:", serializeBigInt(roleData));
+      console.log("[useAdmin]  Role index:", roleIndex);
+      console.log("[useAdmin]  Role active:", roleData.active);
       
       // Check if the user has SuperAdmin role (index 8)
       const isSuperAdmin = roleIndex === SUPER_ADMIN_ROLE && roleData.active === true;
       
-      console.log("[useAdmin] ✅ Is SuperAdmin (role 8):", isSuperAdmin);
+      console.log("[useAdmin]  Is SuperAdmin (role 8):", isSuperAdmin);
       
       // Also try to get the owner via the public state variable
       // Note: The ABI may not have owner() - this is a best-effort attempt
@@ -93,26 +93,26 @@ const useAdmin = (contract, account) => {
           fetchedAdminAddress = account;
         }
       } catch (ownerErr) {
-        console.warn("[useAdmin] ⚠️ Could not determine admin address, using role check only");
+        console.warn("[useAdmin]  Could not determine admin address, using role check only");
         if (isSuperAdmin) {
           fetchedAdminAddress = account;
         }
       }
 
       // Log results
-      console.log("[useAdmin] 🎯 ===== ADMIN CHECK RESULT =====");
-      console.log("[useAdmin] 🎯 Connected Wallet:", account);
-      console.log("[useAdmin] 🎯 Contract Admin:", fetchedAdminAddress);
-      console.log("[useAdmin] 🎯 Is Main Admin:", isSuperAdmin);
-      console.log("[useAdmin] 🎯 Role Index:", roleIndex);
-      console.log("[useAdmin] 🎯 Role Name:", getRoleName(roleIndex));
-      console.log("[useAdmin] 🎯 Role Active:", roleData.active);
+      console.log("[useAdmin]  ===== ADMIN CHECK RESULT =====");
+      console.log("[useAdmin]  Connected Wallet:", account);
+      console.log("[useAdmin]  Contract Admin:", fetchedAdminAddress);
+      console.log("[useAdmin]  Is Main Admin:", isSuperAdmin);
+      console.log("[useAdmin]  Role Index:", roleIndex);
+      console.log("[useAdmin]  Role Name:", getRoleName(roleIndex));
+      console.log("[useAdmin]  Role Active:", roleData.active);
 
       if (isSuperAdmin) {
-        console.log("[useAdmin] 🎉 SUPERADMIN DETECTED! User has full admin access.");
+        console.log("[useAdmin]  SUPERADMIN DETECTED! User has full admin access.");
       } else {
-        console.log("[useAdmin] ⚠️ User is NOT the SuperAdmin.");
-        console.log("[useAdmin] ⚠️ Expected role 8 (SuperAdmin), got role", roleIndex, `(${getRoleName(roleIndex)})`);
+        console.log("[useAdmin]  User is NOT the SuperAdmin.");
+        console.log("[useAdmin]  Expected role 8 (SuperAdmin), got role", roleIndex, `(${getRoleName(roleIndex)})`);
       }
 
       // Update state
@@ -124,9 +124,9 @@ const useAdmin = (contract, account) => {
       
       return isSuperAdmin;
     } catch (err) {
-      console.error("[useAdmin] ❌ Failed to check admin status:", err);
-      console.error("[useAdmin] ❌ Error details:", err.message);
-      console.error("[useAdmin] ❌ Error code:", err.code);
+      console.error("[useAdmin]  Failed to check admin status:", err);
+      console.error("[useAdmin]  Error details:", err.message);
+      console.error("[useAdmin]  Error code:", err.code);
 
       setIsAdmin(false);
       setError(err?.message || "Failed to verify admin status. Please check console for details.");
@@ -139,7 +139,7 @@ const useAdmin = (contract, account) => {
 
   // Expose checkAdmin function for manual triggering
   const checkAdmin = useCallback(async () => {
-    console.log("[useAdmin] 🔄 Manual admin check requested");
+    console.log("[useAdmin]  Manual admin check requested");
     return performAdminCheck();
   }, [performAdminCheck]);
 
@@ -147,7 +147,7 @@ const useAdmin = (contract, account) => {
   useEffect(() => {
     // Skip if no contract or account
     if (!contract || !account) {
-      console.log("[useAdmin] ⏳ Waiting for contract and account before checking admin...");
+      console.log("[useAdmin]  Waiting for contract and account before checking admin...");
       // Reset state when disconnected
       if (isVerified) {
         setIsVerified(false);
@@ -163,9 +163,9 @@ const useAdmin = (contract, account) => {
     const contractChanged = contract !== previousContractRef.current;
 
     if (accountChanged || contractChanged) {
-      console.log("[useAdmin] 🔄 Account or contract changed, re-verifying admin...");
-      console.log("[useAdmin] 🔄 Account changed:", accountChanged);
-      console.log("[useAdmin] 🔄 Contract changed:", contractChanged);
+      console.log("[useAdmin]  Account or contract changed, re-verifying admin...");
+      console.log("[useAdmin]  Account changed:", accountChanged);
+      console.log("[useAdmin]  Contract changed:", contractChanged);
       
       // Reset state for new verification
       setIsLoading(true);

@@ -6,6 +6,13 @@
  */
 import React, { useState, useEffect } from 'react';
 import { getVerificationStats } from '../services/voteReceiptService';
+import {
+  BallotBoxIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  XCircleIcon,
+  SearchIcon,
+} from './common/Icons';
 
 const AdminVerificationAnalytics = () => {
   const [stats, setStats] = useState({
@@ -40,35 +47,35 @@ const AdminVerificationAnalytics = () => {
     {
       label: 'Total Votes',
       value: stats.totalVotes,
-      icon: '🗳️',
+      Icon: BallotBoxIcon,
       color: 'bg-blue-100 text-blue-600',
       bg: 'bg-blue-50 border-blue-200',
     },
     {
       label: 'Verified Votes',
       value: stats.verifiedVotes,
-      icon: '✅',
+      Icon: CheckCircleIcon,
       color: 'bg-green-100 text-green-600',
       bg: 'bg-green-50 border-green-200',
     },
     {
       label: 'Pending Confirmations',
       value: stats.pendingConfirmations,
-      icon: '⏳',
+      Icon: ClockIcon,
       color: 'bg-yellow-100 text-yellow-600',
       bg: 'bg-yellow-50 border-yellow-200',
     },
     {
       label: 'Failed Transactions',
       value: stats.failedTransactions,
-      icon: '❌',
+      Icon: XCircleIcon,
       color: 'bg-red-100 text-red-600',
       bg: 'bg-red-50 border-red-200',
     },
     {
       label: 'Verification Requests',
       value: stats.verificationRequests,
-      icon: '🔍',
+      Icon: SearchIcon,
       color: 'bg-purple-100 text-purple-600',
       bg: 'bg-purple-50 border-purple-200',
     },
@@ -120,7 +127,7 @@ const AdminVerificationAnalytics = () => {
             className={`rounded-xl border p-4 ${card.bg}`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-2xl">{card.icon}</span>
+              <card.Icon className={`w-6 h-6 ${card.color}`} />
               <span className={`text-xs font-semibold px-2 py-1 rounded-full ${card.color}`}>
                 {card.label === 'Verified Votes' && stats.totalVotes > 0
                   ? `${Math.round((stats.verifiedVotes / stats.totalVotes) * 100)}%`

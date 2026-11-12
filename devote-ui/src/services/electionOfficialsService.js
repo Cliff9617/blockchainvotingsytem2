@@ -350,7 +350,7 @@ export const createOfficial = async (officialData, contract = null, adminAccount
         docData.blockchainTxHash = tx.hash || receipt.transactionHash;
         docData.blockchainError = "";
         
-        console.log(`[ElectionOfficialsService] ✅ Blockchain role assigned. TX: ${docData.blockchainTxHash}`);
+        console.log(`[ElectionOfficialsService]  Blockchain role assigned. TX: ${docData.blockchainTxHash}`);
       }
     } catch (blockchainErr) {
       // Blockchain assignment failed - save to Firestore only

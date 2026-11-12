@@ -78,7 +78,7 @@ const PositionCard = ({ position, level, seats, delay }) => {
       </div>
       <h3 className="text-xl font-bold text-dark-green-800 mb-2">{position}</h3>
       <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           {level}
         </span>
         <span className="text-sm font-semibold text-dark-green-600">

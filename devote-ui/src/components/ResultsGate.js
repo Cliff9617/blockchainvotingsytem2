@@ -14,10 +14,10 @@ const ResultsGate = ({ onNavigateToVote }) => {
           <LockIcon className="w-8 h-8 text-slate-700" />
         </div>
 
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200 mb-3">
-          <ShieldCheckIcon className="w-4 h-4 text-amber-700" />
+        <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-700 mb-3">
+          <ShieldCheckIcon className="w-4 h-4" />
           Ballot Confidentiality Protocol
-        </span>
+        </div>
 
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3">
           Election Results Are Sealed

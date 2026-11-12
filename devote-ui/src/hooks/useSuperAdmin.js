@@ -43,17 +43,17 @@ const useSuperAdmin = (contract, account) => {
   const checkSuperAdmin = useCallback(async () => {
     // Prevent concurrent checks
     if (isCheckInProgressRef.current) {
-      console.log('[useSuperAdmin] ⏳ Check already in progress, skipping...');
+      console.log('[useSuperAdmin]  Check already in progress, skipping...');
       return false;
     }
 
-    console.log('[useSuperAdmin] 🔍 Starting Super Admin status check...');
-    console.log('[useSuperAdmin] 📋 Contract instance exists:', !!contract);
-    console.log('[useSuperAdmin] 📋 Connected account:', account);
+    console.log('[useSuperAdmin]  Starting Super Admin status check...');
+    console.log('[useSuperAdmin]  Contract instance exists:', !!contract);
+    console.log('[useSuperAdmin]  Connected account:', account);
 
     // If no contract or account, wait
     if (!contract || !account) {
-      console.log('[useSuperAdmin] ⏳ Waiting for contract or account to be available...');
+      console.log('[useSuperAdmin]  Waiting for contract or account to be available...');
       setIsLoading(true);
       setIsVerified(false);
       setIsSuperAdmin(false);
@@ -65,34 +65,34 @@ const useSuperAdmin = (contract, account) => {
     setError('');
 
     try {
-      console.log('[useSuperAdmin] 📞 Checking role via getUserRole()...');
+      console.log('[useSuperAdmin]  Checking role via getUserRole()...');
 
       // Use getUserRole() which IS in the deployed ABI
       // This returns: (role, county, constituency, ward, active, assignedAt, assignedBy)
       const roleData = await contract.getUserRole(account);
       const roleIndex = Number(roleData.role);
 
-      console.log('[useSuperAdmin] ✅ Raw role data:', serializeBigInt(roleData));
-      console.log('[useSuperAdmin] ✅ Role index:', roleIndex);
-      console.log('[useSuperAdmin] ✅ Role active:', roleData.active);
+      console.log('[useSuperAdmin]  Raw role data:', serializeBigInt(roleData));
+      console.log('[useSuperAdmin]  Role index:', roleIndex);
+      console.log('[useSuperAdmin]  Role active:', roleData.active);
 
       // Check if the user has SuperAdmin role (index 8) AND is active
       const hasSuperAdminRole = roleIndex === SUPER_ADMIN_ROLE && roleData.active === true;
 
-      console.log('[useSuperAdmin] ✅ Is SuperAdmin (role 8):', hasSuperAdminRole);
+      console.log('[useSuperAdmin]  Is SuperAdmin (role 8):', hasSuperAdminRole);
 
       // Log results
-      console.log('[useSuperAdmin] 🎯 ===== SUPER ADMIN CHECK RESULT =====');
-      console.log('[useSuperAdmin] 🎯 Connected Wallet:', account);
-      console.log('[useSuperAdmin] 🎯 Role Index:', roleIndex);
-      console.log('[useSuperAdmin] 🎯 Is SuperAdmin:', hasSuperAdminRole);
-      console.log('[useSuperAdmin] 🎯 Role Active:', roleData.active);
+      console.log('[useSuperAdmin]  ===== SUPER ADMIN CHECK RESULT =====');
+      console.log('[useSuperAdmin]  Connected Wallet:', account);
+      console.log('[useSuperAdmin]  Role Index:', roleIndex);
+      console.log('[useSuperAdmin]  Is SuperAdmin:', hasSuperAdminRole);
+      console.log('[useSuperAdmin]  Role Active:', roleData.active);
 
       if (hasSuperAdminRole) {
-        console.log('[useSuperAdmin] 🎉 SUPERADMIN DETECTED! User has full election lifecycle authority.');
+        console.log('[useSuperAdmin]  SUPERADMIN DETECTED! User has full election lifecycle authority.');
       } else {
-        console.log('[useSuperAdmin] ⚠️ User is NOT the SuperAdmin.');
-        console.log('[useSuperAdmin] ⚠️ Expected role 8 (SuperAdmin), got role', roleIndex);
+        console.log('[useSuperAdmin]  User is NOT the SuperAdmin.');
+        console.log('[useSuperAdmin]  Expected role 8 (SuperAdmin), got role', roleIndex);
       }
 
       // Update state
@@ -103,8 +103,8 @@ const useSuperAdmin = (contract, account) => {
 
       return hasSuperAdminRole;
     } catch (err) {
-      console.error('[useSuperAdmin] ❌ Failed to check Super Admin status:', err);
-      console.error('[useSuperAdmin] ❌ Error details:', err.message);
+      console.error('[useSuperAdmin]  Failed to check Super Admin status:', err);
+      console.error('[useSuperAdmin]  Error details:', err.message);
 
       setIsSuperAdmin(false);
       setError(err?.message || 'Failed to verify Super Admin status');
@@ -117,7 +117,7 @@ const useSuperAdmin = (contract, account) => {
 
   // Expose recheck function for manual triggering
   const recheck = useCallback(async () => {
-    console.log('[useSuperAdmin] 🔄 Manual Super Admin recheck requested');
+    console.log('[useSuperAdmin]  Manual Super Admin recheck requested');
     return checkSuperAdmin();
   }, [checkSuperAdmin]);
 
@@ -125,7 +125,7 @@ const useSuperAdmin = (contract, account) => {
   useEffect(() => {
     // Skip if no contract or account
     if (!contract || !account) {
-      console.log('[useSuperAdmin] ⏳ Waiting for contract and account before checking...');
+      console.log('[useSuperAdmin]  Waiting for contract and account before checking...');
       if (isVerified) {
         setIsVerified(false);
         setIsSuperAdmin(false);
@@ -139,9 +139,9 @@ const useSuperAdmin = (contract, account) => {
     const contractChanged = contract !== previousContractRef.current;
 
     if (accountChanged || contractChanged) {
-      console.log('[useSuperAdmin] 🔄 Account or contract changed, re-verifying...');
-      console.log('[useSuperAdmin] 🔄 Account changed:', accountChanged);
-      console.log('[useSuperAdmin] 🔄 Contract changed:', contractChanged);
+      console.log('[useSuperAdmin]  Account or contract changed, re-verifying...');
+      console.log('[useSuperAdmin]  Account changed:', accountChanged);
+      console.log('[useSuperAdmin]  Contract changed:', contractChanged);
 
       // Reset state for new verification
       setIsLoading(true);

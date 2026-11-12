@@ -166,7 +166,7 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
           request.constituency || '',
           request.ward || ''
         );
-        console.log('[VoterRegistrationRequests] ✅ Voter registered on blockchain');
+        console.log('[VoterRegistrationRequests]  Voter registered on blockchain');
       } catch (blockchainError) {
         const errorMessage = String(blockchainError.message || blockchainError);
         // "Voter already registered" is idempotent - treat as success
@@ -174,7 +174,7 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
           console.warn('[VoterRegistrationRequests] Voter already registered on-chain, continuing:', request.walletAddress);
         } else {
           // Any other blockchain error is BLOCKING - do not mark as approved
-          console.error('[VoterRegistrationRequests] ❌ Blockchain registration failed:', blockchainError);
+          console.error('[VoterRegistrationRequests]  Blockchain registration failed:', blockchainError);
           throw new Error(
             "Blockchain registration failed: " + (blockchainError.reason || blockchainError.shortMessage || blockchainError.message) +
             ". Voter has NOT been approved."
@@ -220,7 +220,7 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
         r.id === request.id ? { ...r, status: 'approved', updatedAt: new Date().toISOString() } : r
       ));
     } catch (err) {
-      console.error('[VoterRegistrationRequests] ❌ Error approving request:', err);
+      console.error('[VoterRegistrationRequests]  Error approving request:', err);
       alert('Failed to approve registration: ' + (err.message || 'Unknown error'));
     } finally {
       setIsProcessing(false);

@@ -1,5 +1,6 @@
 import React from 'react';
 import ElectionTimer from './ElectionTimer';
+import { ShieldCheckIcon } from './common/Icons';
 
 const HeroSection = ({ onConnectWallet, onNavigate, electionStarted, electionEnded }) => {
   const handleHowItWorksClick = () => {
@@ -22,9 +23,11 @@ const HeroSection = ({ onConnectWallet, onNavigate, electionStarted, electionEnd
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
         <div className="text-center">
           {/* Badge */}
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-600/50 border border-dark-green-400/30 mb-6 backdrop-blur-sm">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2"></span>
-            <span className="text-xs font-semibold tracking-wide uppercase">Official Blockchain Election Platform</span>
+          <div className="inline-flex items-center gap-2 mb-6">
+            <ShieldCheckIcon className="w-4 h-4 text-green-300" />
+            <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-100">
+              Official Blockchain Election Platform
+            </span>
           </div>
 
           {/* Slogan */}

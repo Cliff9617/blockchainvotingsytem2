@@ -240,7 +240,7 @@ export const generateHTMLReport = (report) => {
 </head>
 <body>
   <div class="header">
-    <h1>🗳️ DeVote Election Report</h1>
+    <h1>DeVote Election Report</h1>
     <div class="subtitle">AI-Generated Election Summary</div>
   </div>
 
@@ -315,7 +315,7 @@ export const generateHTMLReport = (report) => {
     html += `</tbody></table>`;
     
     if (!stats.electionEnded) {
-      html += `<div class="withheld-notice">🔒 Winner display is withheld until the election is officially ended.</div>`;
+      html += `<div class="withheld-notice">Winner display is withheld until the election is officially ended.</div>`;
     }
   });
 

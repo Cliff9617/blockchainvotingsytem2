@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import {
+  CheckIcon,
+  BuildingIcon,
+  CheckCircleIcon,
+  GlobeIcon,
+  EyeIcon,
+  LockIcon,
+  BanIcon,
+  BoltIcon,
+} from '../components/common/Icons';
 
 const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
   const [openFaq, setOpenFaq] = useState(null);
@@ -112,12 +122,12 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
   ];
 
   const safetyFeatures = [
-    { title: "One Vote Per Person", icon: "✅" },
-    { title: "Votes Locked to Your Area", icon: "🌍" },
-    { title: "Open and Transparent Results", icon: "👁️" },
-    { title: "Private Voter Details", icon: "🔒" },
-    { title: "No Proxy Voting", icon: "🚫" },
-    { title: "Instant Tamper-Proof Results", icon: "⚡" }
+    { title: "One Vote Per Person", Icon: CheckCircleIcon },
+    { title: "Votes Locked to Your Area", Icon: GlobeIcon },
+    { title: "Open and Transparent Results", Icon: EyeIcon },
+    { title: "Private Voter Details", Icon: LockIcon },
+    { title: "No Proxy Voting", Icon: BanIcon },
+    { title: "Instant Tamper-Proof Results", Icon: BoltIcon }
   ];
 
   return (
@@ -140,9 +150,9 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-600/50 border border-dark-green-400/30 mb-6 backdrop-blur-sm">
-              <span className="text-xs font-semibold tracking-wide uppercase">Simple Guide</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-200 mb-6">
+              Simple Guide
+            </p>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
               How Does <span className="text-green-300">DeVote</span> Work?
@@ -152,16 +162,13 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
               DeVote is a secure, transparent, and simple blockchain-powered voting system. You do not need to be a blockchain expert — if you can use a phone or computer, you can vote.
             </p>
 
-            <div className="flex flex-wrap justify-center gap-3">
-              <span className="px-4 py-2 bg-dark-green-600/30 border border-dark-green-400/30 rounded-full text-sm">
-                ✓ No downloads needed
-              </span>
-              <span className="px-4 py-2 bg-dark-green-600/30 border border-dark-green-400/30 rounded-full text-sm">
-                ✓ Works on mobile and desktop
-              </span>
-              <span className="px-4 py-2 bg-dark-green-600/30 border border-dark-green-400/30 rounded-full text-sm">
-                ✓ Available nationwide
-              </span>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+              {["No downloads needed", "Works on mobile and desktop", "Available nationwide"].map((label) => (
+                <span key={label} className="inline-flex items-center gap-1.5 text-sm text-dark-green-100">
+                  <CheckIcon className="w-4 h-4 text-green-300" />
+                  {label}
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -177,9 +184,9 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
       <section className="py-20 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-              <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">Step-by-Step Guide</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+              Step-by-Step Guide
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-4">
               Voting in 5 Easy Steps
             </h2>
@@ -204,7 +211,7 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
                     <ul className="space-y-2">
                       {step.checklist.map((item, i) => (
                         <li key={i} className="flex items-start text-sm text-gray-600">
-                          <span className="text-green-500 mr-2 mt-0.5">✓</span>
+                          <CheckIcon className="w-3.5 h-3.5 text-green-500 mr-2 mt-1 flex-shrink-0" />
                           {item}
                         </li>
                       ))}
@@ -224,9 +231,9 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-              <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">The Ballot</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+              The Ballot
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-4">
               What Are You Voting For?
             </h2>
@@ -238,12 +245,12 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {positions.map((pos, index) => (
               <div key={index} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                  <span className="text-2xl">🏛️</span>
+                <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                  <BuildingIcon className="w-6 h-6 text-dark-green-600" />
                 </div>
                 <h3 className="text-xl font-bold text-dark-green-800 mb-2">{pos.position}</h3>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                     {pos.level}
                   </span>
                   <span className="text-sm font-semibold text-dark-green-600">
@@ -260,9 +267,9 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-              <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">Safety & Fairness</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+              Safety & Fairness
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-4">
               How Is Your Vote Kept Safe?
             </h2>
@@ -271,8 +278,8 @@ const HowItWorksPage = ({ onConnectWallet, isConnected, account, onNavigate }) =
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {safetyFeatures.map((feature, index) => (
               <div key={index} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-50 to-dark-green-100 flex items-center justify-center mb-5">
-                  <span className="text-2xl">{feature.icon}</span>
+                <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                  <feature.Icon className="w-6 h-6 text-dark-green-600" />
                 </div>
                 <h3 className="text-xl font-bold text-dark-green-800">{feature.title}</h3>
               </div>

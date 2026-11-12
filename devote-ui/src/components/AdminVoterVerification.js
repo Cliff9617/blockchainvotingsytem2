@@ -150,14 +150,14 @@ const AdminVoterVerification = () => {
           throw new Error("Blockchain transaction failed - voter was not registered on-chain");
         }
 
-        console.log('[AdminVoterVerification] ✅ Voter registered on blockchain successfully:', normalizedAddress);
+        console.log('[AdminVoterVerification]  Voter registered on blockchain successfully:', normalizedAddress);
       } else {
         console.log('[AdminVoterVerification] Voter already registered on-chain, skipping tx:', normalizedAddress);
       }
 
       // STEP 2: Verify on-chain that registeredVoters(wallet) === true
       const verifyRegistered = await contract.registeredVoters(normalizedAddress);
-      console.log('[AdminVoterVerification] ✅ Blockchain verification - registeredVoters():', verifyRegistered);
+      console.log('[AdminVoterVerification]  Blockchain verification - registeredVoters():', verifyRegistered);
 
       if (!verifyRegistered) {
         throw new Error(
@@ -210,7 +210,7 @@ const AdminVoterVerification = () => {
       showNotification('Voter approved and registered on blockchain successfully!', 'success');
       fetchPendingVoters(); // Refresh the list
     } catch (error) {
-      console.error('[AdminVoterVerification] ❌ Error approving voter:', error);
+      console.error('[AdminVoterVerification]  Error approving voter:', error);
       // Do NOT mark as approved in Firestore if blockchain failed
       const reason = error?.reason || error?.shortMessage || error?.message || 'Unknown error';
       showNotification('Failed to approve voter (blockchain registration failed): ' + reason, 'error');
@@ -550,7 +550,7 @@ const AdminVoterVerification = () => {
                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium text-center ${
                           voter.ocrMatched ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {voter.ocrMatched ? '✓ OCR Verified' : '✗ OCR Mismatch'}
+                          {voter.ocrMatched ? 'OCR Verified' : 'OCR Mismatch'}
                         </span>
                       )}
                     </div>

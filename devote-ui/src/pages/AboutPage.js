@@ -1,6 +1,19 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import {
+  ShieldCheckIcon,
+  EyeIcon,
+  GlobeIcon,
+  LockIcon,
+  CheckCircleIcon,
+  BoltIcon,
+  ScaleIcon,
+  CheckIcon,
+  BuildingIcon,
+  MapPinIcon,
+  UsersIcon,
+} from '../components/common/Icons';
 
 const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
   const handleHowItWorksClick = () => {
@@ -9,7 +22,7 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar 
+      <Navbar
         onConnectWallet={onConnectWallet}
         isConnected={isConnected}
         account={account}
@@ -27,9 +40,9 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-600/50 border border-dark-green-400/30 mb-6 backdrop-blur-sm">
-              <span className="text-xs font-semibold tracking-wide uppercase">About DeVote</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-200 mb-6">
+              About DeVote
+            </p>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
               Built for <span className="text-green-300">Every Kenyan</span>
@@ -53,9 +66,9 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-                <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">Our Purpose</span>
-              </div>
+              <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+                Our Purpose
+              </p>
 
               <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-6">
                 What is DeVote?
@@ -105,9 +118,9 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-              <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">Why DeVote?</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+              Why DeVote?
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-4">
               What Makes This System Different?
             </h2>
@@ -119,8 +132,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Card 1 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                <span className="text-2xl">🛡️</span>
+              <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                <ShieldCheckIcon className="w-6 h-6 text-dark-green-600" />
               </div>
               <h3 className="text-xl font-bold text-dark-green-800 mb-3">Your Vote is Protected</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -130,8 +143,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Card 2 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                <span className="text-2xl">👁️</span>
+              <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                <EyeIcon className="w-6 h-6 text-dark-green-600" />
               </div>
               <h3 className="text-xl font-bold text-dark-green-800 mb-3">Transparent Results</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -141,8 +154,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Card 3 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                <span className="text-2xl">🌍</span>
+              <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                <GlobeIcon className="w-6 h-6 text-dark-green-600" />
               </div>
               <h3 className="text-xl font-bold text-dark-green-800 mb-3">Region-Locked Ballots</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -152,8 +165,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Card 4 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                <span className="text-2xl">🔒</span>
+              <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                <LockIcon className="w-6 h-6 text-dark-green-600" />
               </div>
               <h3 className="text-xl font-bold text-dark-green-800 mb-3">Tamper-Proof Records</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -163,8 +176,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Card 5 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                <span className="text-2xl">✅</span>
+              <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                <CheckCircleIcon className="w-6 h-6 text-dark-green-600" />
               </div>
               <h3 className="text-xl font-bold text-dark-green-800 mb-3">One Person, One Vote</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -174,8 +187,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Card 6 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-dark-green-500 to-dark-green-700 flex items-center justify-center mb-5">
-                <span className="text-2xl">⚡</span>
+              <div className="w-12 h-12 rounded-xl bg-dark-green-50 flex items-center justify-center mb-5">
+                <BoltIcon className="w-6 h-6 text-dark-green-600" />
               </div>
               <h3 className="text-xl font-bold text-dark-green-800 mb-3">Fast Digital Tallying</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -191,9 +204,9 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-                <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">Governance</span>
-              </div>
+              <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+                Governance
+              </p>
 
               <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-6">
                 Built Around Election Integrity
@@ -207,37 +220,21 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
             <div className="lg:pl-8">
               <div className="bg-gradient-to-br from-dark-green-50 to-dark-green-100 rounded-2xl shadow-lg p-8 border border-dark-green-200">
                 <div className="text-center mb-6">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-dark-green-600 flex items-center justify-center mb-4">
-                    <span className="text-3xl">⚖️</span>
+                  <div className="w-14 h-14 mx-auto rounded-full bg-dark-green-600 flex items-center justify-center mb-4">
+                    <ScaleIcon className="w-7 h-7 text-white" />
                   </div>
                   <h3 className="text-2xl font-bold text-dark-green-800">Election Integrity</h3>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-4">
-                      <span className="text-green-600">✓</span>
+                  {['Verified voters', 'Approved candidates', 'Public results', 'Secure audit trail'].map((item) => (
+                    <div key={item} className="flex items-center p-4 bg-white rounded-xl shadow-sm">
+                      <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center mr-4">
+                        <CheckIcon className="w-4 h-4 text-green-600" />
+                      </div>
+                      <span className="font-medium text-dark-green-800">{item}</span>
                     </div>
-                    <span className="font-medium text-dark-green-800">Verified voters</span>
-                  </div>
-                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-4">
-                      <span className="text-green-600">✓</span>
-                    </div>
-                    <span className="font-medium text-dark-green-800">Approved candidates</span>
-                  </div>
-                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-4">
-                      <span className="text-green-600">✓</span>
-                    </div>
-                    <span className="font-medium text-dark-green-800">Public results</span>
-                  </div>
-                  <div className="flex items-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-4">
-                      <span className="text-green-600">✓</span>
-                    </div>
-                    <span className="font-medium text-dark-green-800">Secure audit trail</span>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -249,9 +246,9 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-dark-green-50 border border-dark-green-200 mb-6">
-              <span className="text-xs font-semibold tracking-wide uppercase text-dark-green-700">Support</span>
-            </div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-dark-green-600 mb-6">
+              Support
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-dark-green-800 mb-4">
               Voter Support and Assistance
             </h2>
@@ -263,8 +260,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Support Card 1 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100">
-              <div className="w-12 h-12 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
-                <span className="text-xl">🏛️</span>
+              <div className="w-11 h-11 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
+                <BuildingIcon className="w-5 h-5 text-dark-green-600" />
               </div>
               <h3 className="text-lg font-bold text-dark-green-800 mb-2">National Support Desk</h3>
               <p className="text-sm text-gray-500 mb-2">Nairobi</p>
@@ -273,8 +270,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Support Card 2 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100">
-              <div className="w-12 h-12 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
-                <span className="text-xl">🏢</span>
+              <div className="w-11 h-11 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
+                <GlobeIcon className="w-5 h-5 text-dark-green-600" />
               </div>
               <h3 className="text-lg font-bold text-dark-green-800 mb-2">County Election Office</h3>
               <p className="text-sm text-gray-500 mb-2">County Level Support</p>
@@ -283,8 +280,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Support Card 3 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100">
-              <div className="w-12 h-12 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
-                <span className="text-xl">📍</span>
+              <div className="w-11 h-11 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
+                <MapPinIcon className="w-5 h-5 text-dark-green-600" />
               </div>
               <h3 className="text-lg font-bold text-dark-green-800 mb-2">Constituency Office</h3>
               <p className="text-sm text-gray-500 mb-2">Local voter assistance</p>
@@ -293,8 +290,8 @@ const AboutPage = ({ onConnectWallet, isConnected, account, onNavigate }) => {
 
             {/* Support Card 4 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100">
-              <div className="w-12 h-12 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
-                <span className="text-xl">🤝</span>
+              <div className="w-11 h-11 rounded-xl bg-dark-green-100 flex items-center justify-center mb-4">
+                <UsersIcon className="w-5 h-5 text-dark-green-600" />
               </div>
               <h3 className="text-lg font-bold text-dark-green-800 mb-2">Ward Support Desk</h3>
               <p className="text-sm text-gray-500 mb-2">Polling station guidance</p>

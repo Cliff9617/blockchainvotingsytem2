@@ -10,16 +10,16 @@ export const testConnection = async () => {
     const result = await connectWallet();
     
     if (result) {
-      console.log('✅ Wallet connected successfully!');
+      console.log(' Wallet connected successfully!');
       console.log('Connected address:', result.address);
       console.log('Contract instance created:', !!result.contract);
       return true;
     } else {
-      console.log('❌ Wallet connection failed');
+      console.log(' Wallet connection failed');
       return false;
     }
   } catch (error) {
-    console.error('❌ Error testing connection:', error);
+    console.error(' Error testing connection:', error);
     return false;
   }
 };

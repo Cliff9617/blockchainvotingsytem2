@@ -205,7 +205,7 @@ const AIReportGenerator = ({
                 </table>
                 {!report.stats.electionEnded && (
                   <div className="withheld-notice">
-                    🔒 Winner display is withheld until the election is officially ended.
+                    Winner display is withheld until the election is officially ended.
                   </div>
                 )}
               </div>

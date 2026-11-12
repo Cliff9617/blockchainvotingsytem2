@@ -1,12 +1,13 @@
 import React from 'react';
+import { GlobeIcon, BuildingIcon, MapPinIcon, UsersIcon } from './common/Icons';
 
-const StatCard = ({ icon, value, label, delay }) => (
-  <div 
+const StatCard = ({ Icon, value, label, delay }) => (
+  <div
     className="bg-white rounded-2xl shadow-lg p-6 md:p-8 text-center hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100"
     style={{ animationDelay: `${delay}ms` }}
   >
-    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-dark-green-50 flex items-center justify-center">
-      <span className="text-3xl">{icon}</span>
+    <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-dark-green-50 flex items-center justify-center">
+      <Icon className="w-7 h-7 text-dark-green-600" />
     </div>
     <h3 className="text-4xl md:text-5xl font-bold text-dark-green-800 mb-2">{value}</h3>
     <p className="text-gray-600 font-medium">{label}</p>
@@ -15,10 +16,10 @@ const StatCard = ({ icon, value, label, delay }) => (
 
 const ElectionStats = () => {
   const stats = [
-    { icon: '🗺️', value: '47', label: 'Counties' },
-    { icon: '🏛️', value: '290', label: 'Constituencies' },
-    { icon: '📍', value: '1,450', label: 'Wards' },
-    { icon: '👥', value: '22M+', label: 'Registered Voters' },
+    { Icon: GlobeIcon, value: '47', label: 'Counties' },
+    { Icon: BuildingIcon, value: '290', label: 'Constituencies' },
+    { Icon: MapPinIcon, value: '1,450', label: 'Wards' },
+    { Icon: UsersIcon, value: '22M+', label: 'Registered Voters' },
   ];
 
   return (
@@ -37,7 +38,7 @@ const ElectionStats = () => {
           {stats.map((stat, index) => (
             <StatCard
               key={index}
-              icon={stat.icon}
+              Icon={stat.Icon}
               value={stat.value}
               label={stat.label}
               delay={index * 100}

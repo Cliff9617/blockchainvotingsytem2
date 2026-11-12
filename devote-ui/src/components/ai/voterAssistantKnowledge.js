@@ -188,7 +188,7 @@ export const voterKnowledgeBase = [
   {
     id: "metamask_android",
     keywords: ["android", "phone", "mobile", "not detected", "doesn't work", "can't connect"],
-    response: "For Android/Mobile users:\n\n⚠️ Important: MetaMask on mobile works differently than desktop.\n\n1. Download the MetaMask app from Google Play Store\n2. Create or import your wallet in the app\n3. Open the MetaMask app and go to the browser (dApp browser)\n4. Enter the DeVote website URL INSIDE the MetaMask browser\n5. The site will now detect your wallet\n6. Click 'Connect MetaMask' when prompted\n\n⚠️ Do NOT try to use Chrome or other browsers directly - they won't detect MetaMask. You MUST use the in-app browser."
+    response: "For Android/Mobile users:\n\nImportant: MetaMask on mobile works differently than desktop.\n\n1. Download the MetaMask app from Google Play Store\n2. Create or import your wallet in the app\n3. Open the MetaMask app and go to the browser (dApp browser)\n4. Enter the DeVote website URL INSIDE the MetaMask browser\n5. The site will now detect your wallet\n6. Click 'Connect MetaMask' when prompted\n\nImportant: Do NOT try to use Chrome or other browsers directly - they won't detect MetaMask. You MUST use the in-app browser."
   },
   {
     id: "sepolia_network",
@@ -207,7 +207,7 @@ export const voterKnowledgeBase = [
   {
     id: "eligibility_requirements",
     keywords: ["eligible", "eligibility", "can i vote", "allowed to vote", "not eligible", "ineligible"],
-    response: "To be eligible to vote in DeVote, you must:\n\n✓ Be a registered voter in the system\n✓ Have your registration approved by an admin\n✓ Have your wallet address match the approved registration\n✓ Be connected to the correct network (Sepolia)\n✓ Be voting during the active election period\n✓ Not have already voted in this election\n\nIf you meet all these criteria but still can't vote, please contact support."
+    response: "To be eligible to vote in DeVote, you must:\n\n Be a registered voter in the system\n Have your registration approved by an admin\n Have your wallet address match the approved registration\n Be connected to the correct network (Sepolia)\n Be voting during the active election period\n Not have already voted in this election\n\nIf you meet all these criteria but still can't vote, please contact support."
   },
   {
     id: "not_eligible_reasons",
@@ -221,7 +221,7 @@ export const voterKnowledgeBase = [
   {
     id: "how_to_vote",
     keywords: ["how to vote", "cast vote", "voting process", "vote for", "select candidate"],
-    response: "How to cast your vote in DeVote:\n\n1. Ensure you're connected to MetaMask\n2. Navigate to the Voting page\n3. Select the position you want to vote for (President, Governor, etc.)\n4. View the list of candidates for that position\n5. Click on your preferred candidate\n6. Review your selection carefully\n7. Click 'Vote' button\n8. Confirm the transaction in MetaMask\n9. Wait for blockchain confirmation (usually 15-30 seconds)\n10. You'll see a success message once your vote is recorded\n\n⚠️ Important: You can only vote once per position. Choose carefully!"
+    response: "How to cast your vote in DeVote:\n\n1. Ensure you're connected to MetaMask\n2. Navigate to the Voting page\n3. Select the position you want to vote for (President, Governor, etc.)\n4. View the list of candidates for that position\n5. Click on your preferred candidate\n6. Review your selection carefully\n7. Click 'Vote' button\n8. Confirm the transaction in MetaMask\n9. Wait for blockchain confirmation (usually 15-30 seconds)\n10. You'll see a success message once your vote is recorded\n\nImportant: You can only vote once per position. Choose carefully!"
   },
   {
     id: "voting_positions",
@@ -291,7 +291,7 @@ export const voterKnowledgeBase = [
   {
     id: "blockchain_security",
     keywords: ["blockchain", "secure", "security", "tamper", "hack", "safe", "trust"],
-    response: "How blockchain secures your vote:\n\n✓ Immutability - Once recorded, votes cannot be changed\n✓ Transparency - All votes are publicly verifiable on the blockchain\n✓ Decentralization - No single point of failure or control\n✓ Cryptographic Security - Votes are protected by advanced cryptography\n✓ Audit Trail - Complete transaction history is maintained\n✓ Anonymity - Your vote is linked to your wallet, not your identity\n\nThe blockchain ensures that:\n• Admins cannot alter votes\n• Votes cannot be deleted\n• Results are mathematically verifiable\n• The election is transparent and trustworthy"
+    response: "How blockchain secures your vote:\n\n Immutability - Once recorded, votes cannot be changed\n Transparency - All votes are publicly verifiable on the blockchain\n Decentralization - No single point of failure or control\n Cryptographic Security - Votes are protected by advanced cryptography\n Audit Trail - Complete transaction history is maintained\n Anonymity - Your vote is linked to your wallet, not your identity\n\nThe blockchain ensures that:\n• Admins cannot alter votes\n• Votes cannot be deleted\n• Results are mathematically verifiable\n• The election is transparent and trustworthy"
   },
   {
     id: "privacy_protection",
@@ -305,12 +305,12 @@ export const voterKnowledgeBase = [
   {
     id: "seed_phrase_warning",
     keywords: ["seed phrase", "private key", "recovery phrase", "password", "secret"],
-    response: "⚠️ SECURITY WARNING ⚠️\n\nNEVER share your:\n• MetaMask seed phrase (12-24 words)\n• Private key\n• Password\n• Recovery phrase\n\nDeVote will NEVER ask for this information. Anyone requesting these details is trying to steal your wallet and funds.\n\nKeep your seed phrase offline and secure. If someone has your seed phrase, they have complete control over your wallet."
+    response: "SECURITY WARNING\n\nNEVER share your:\n• MetaMask seed phrase (12-24 words)\n• Private key\n• Password\n• Recovery phrase\n\nDeVote will NEVER ask for this information. Anyone requesting these details is trying to steal your wallet and funds.\n\nKeep your seed phrase offline and secure. If someone has your seed phrase, they have complete control over your wallet."
   },
   {
     id: "scam_warning",
     keywords: ["scam", "fake", "phishing", "suspicious", "fraud"],
-    response: "⚠️ SCAM ALERT ⚠️\n\nBe aware of:\n• Fake websites that look like DeVote\n• Messages asking for your seed phrase\n• Emails claiming to be from DeVote support asking for personal info\n• Anyone offering to help you vote for a fee\n• Links in social media claiming to be voting portals\n\nAlways verify you're on the official DeVote website. Check the URL carefully. DeVote will never contact you asking for private information."
+    response: "SCAM ALERT\n\nBe aware of:\n• Fake websites that look like DeVote\n• Messages asking for your seed phrase\n• Emails claiming to be from DeVote support asking for personal info\n• Anyone offering to help you vote for a fee\n• Links in social media claiming to be voting portals\n\nAlways verify you're on the official DeVote website. Check the URL carefully. DeVote will never contact you asking for private information."
   },
   
   // ============================================

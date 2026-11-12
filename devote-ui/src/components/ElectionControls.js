@@ -1,5 +1,6 @@
 import React from 'react';
 import usePermissions from '../hooks/usePermissions';
+import { PlayIcon, StopIcon } from './common/Icons';
 
 /**
  * ElectionControls - Election Lifecycle Controls
@@ -62,7 +63,7 @@ const ElectionControls = ({
         <h3 className="text-lg font-semibold text-gray-900">Election Lifecycle Controls</h3>
         <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-100 border border-green-300 rounded-full">
           <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-          <span className="text-xs font-semibold text-green-800">🟢 Super Admin</span>
+          <span className="text-xs font-semibold text-green-800">Super Admin</span>
         </div>
       </div>
       <p className="text-sm text-gray-500 mb-4">Election Lifecycle Authority — Only you can control the election lifecycle.</p>
@@ -73,8 +74,8 @@ const ElectionControls = ({
         <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-hard">
-                <span className="text-white text-xl font-bold">▶️</span>
+              <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-hard text-white">
+                <PlayIcon className="w-6 h-6" />
               </div>
               <div>
                 <h4 className="font-semibold text-green-900">Start Election</h4>
@@ -115,8 +116,8 @@ const ElectionControls = ({
         <div className="p-6 bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-hard">
-                <span className="text-white text-xl font-bold">⏹️</span>
+              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-hard text-white">
+                <StopIcon className="w-6 h-6" />
               </div>
               <div>
                 <h4 className="font-semibold text-red-900">End Election</h4>

@@ -1,10 +1,11 @@
 import React from 'react';
+import { ClockIcon, StopIcon, BoltIcon } from './common/Icons';
 
 const ElectionTimer = ({ electionStarted, electionEnded, durationMinutes = 10 }) => {
   const getStatusColor = () => {
-    if (!electionStarted) return 'bg-gray-100 text-gray-800 border border-gray-200';
-    if (electionEnded) return 'bg-red-100 text-red-800 border border-red-200';
-    return 'bg-dark-green-100 text-dark-green-800 border border-dark-green-200';
+    if (!electionStarted) return 'bg-gray-100 text-gray-800';
+    if (electionEnded) return 'bg-red-100 text-red-800';
+    return 'bg-dark-green-100 text-dark-green-800';
   };
 
   const getStatusText = () => {
@@ -13,10 +14,10 @@ const ElectionTimer = ({ electionStarted, electionEnded, durationMinutes = 10 })
     return 'ELECTION ACTIVE';
   };
 
-  const getStatusIcon = () => {
-    if (!electionStarted) return '⏳';
-    if (electionEnded) return '⏹️';
-    return '⚡';
+  const StatusIcon = () => {
+    if (!electionStarted) return <ClockIcon className="w-4 h-4" />;
+    if (electionEnded) return <StopIcon className="w-4 h-4" />;
+    return <BoltIcon className="w-4 h-4" />;
   };
 
   return (
@@ -28,9 +29,9 @@ const ElectionTimer = ({ electionStarted, electionEnded, durationMinutes = 10 })
             Current state of the election process
           </p>
         </div>
-        
-        <div className={`px-4 py-2 rounded-xl font-bold ${getStatusColor()}`}>
-          <span className="mr-2 text-lg">{getStatusIcon()}</span>
+
+        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm ${getStatusColor()}`}>
+          <StatusIcon />
           {getStatusText()}
         </div>
       </div>
