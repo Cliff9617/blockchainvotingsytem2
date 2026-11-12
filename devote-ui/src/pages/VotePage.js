@@ -33,6 +33,8 @@ const VotePage = ({
   hasVoted = false,
   totalVotes = 0,
   getVotePercentage,
+  hasVotedForPosition,
+  canVoteForPosition,
   // Actions
   onVote,
   onAddCandidate,
@@ -191,6 +193,7 @@ const VotePage = ({
         // Store voter location data for filtering
         if (result.voter) {
           const voterLocationData = {
+            fullName: result.voter.fullName || voterForm.fullName || "Citizen Voter",
             county: result.voter.county,
             constituency: result.voter.constituency,
             ward: result.voter.ward,
@@ -651,44 +654,7 @@ const VotePage = ({
       {/* ===== VOTER BALLOT (after voter login) ===== */}
       {shouldShowVoterBallot && (
         <div className="min-h-screen">
-          {/* Connection status bar */}
-          <div className="bg-white border-b border-gray-200 px-4 py-3">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className="text-sm text-gray-600">
-                    {isConnected ? `Connected: ${account?.slice(0, 6)}...${account?.slice(-4)}` : 'Wallet Not Connected'}
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <span className={`text-sm px-3 py-1 rounded-full border ${
-                    electionEnded
-                      ? 'bg-red-50 text-red-700 border-red-200'
-                      : electionStarted
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                  }`}>
-                    {electionEnded ? 'Election Ended' : electionStarted ? 'Election Active' : 'Not Started'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <ElectionTimer electionStarted={electionStarted} electionEnded={electionEnded} />
-                <button
-                  onClick={() => {
-                    setVoterLoggedIn(false);
-                    setShowSignInSection(false);
-                  }}
-                  className="text-sm text-gray-600 hover:text-gray-900 underline"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Election Dashboard */}
+          {/* Election Dashboard with unified header, welcome hero, and sequential voting flow */}
           <ElectionDashboard
             electionStarted={electionStarted}
             electionEnded={electionEnded}
@@ -699,9 +665,17 @@ const VotePage = ({
             isLoading={isLoading}
             error={combinedError}
             onVote={onVote}
+            hasVotedForPosition={hasVotedForPosition}
+            canVoteForPosition={canVoteForPosition}
             totalVotes={totalVotes}
             getVotePercentage={getVotePercentage}
             isAdmin={isAdmin}
+            isConnected={isConnected}
+            account={account}
+            onSignOut={() => {
+              setVoterLoggedIn(false);
+              setShowSignInSection(false);
+            }}
             onProceedToResults={() => {
               if (onNavigate) {
                 onNavigate('results');
