@@ -234,7 +234,7 @@ export const formatCandidateDisplayName = (candidate, candidateIndex = null) => 
   return candidate.name || `Candidate ${candidate.id || 1}`;
 };
 
-export default {
+const electionFilters = {
   formatCandidateDisplayName,
   normalizeText,
   resolveVoterCountyName,
@@ -254,3 +254,5 @@ export default {
   POSITION_NAMES,
   POSITION_ORDER,
 };
+
+export default electionFilters;

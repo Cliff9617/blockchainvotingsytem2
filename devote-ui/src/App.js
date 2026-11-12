@@ -290,7 +290,7 @@ function App() {
     
     // No access
     return false;
-  }, [isContractAdmin, adminVerified, rbacVerified, hasAnyRole, isSuperAdmin, isNationalCommissioner, hasPermission, adminAddress, account]);
+  }, [isContractAdmin, adminVerified, rbacVerified, hasAnyRole, isSuperAdmin, isNationalCommissioner, hasPermission]);
 
   // Props for all pages
   const baseProps = {

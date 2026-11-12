@@ -379,15 +379,6 @@ const AdminPanel = ({
       }
     }
 
-    // Build candidate location info
-    const candidateLocation = {
-      position,
-      county: locationReqs.showCounty ? candidateData.county : "",
-      constituency: locationReqs.showConstituency ? candidateData.constituency : "",
-      ward: locationReqs.showWard ? candidateData.ward : "",
-      location: locationReqs.location,
-    };
-
     // CRITICAL FIX: Calculate positionIndex from position string
     const positionIndex = getPositionIndex(position);
     

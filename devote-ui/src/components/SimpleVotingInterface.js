@@ -1,11 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   groupCandidatesByPosition,
   filterCandidatesForVoter,
   getPositionDisplayName,
   formatCandidateDisplayName,
   POSITIONS,
-  POSITION_ORDER,
 } from "../utils/electionFilters";
 import SimpleCandidateCard from "./SimpleCandidateCard";
 import {
@@ -14,7 +13,6 @@ import {
   AlertTriangleIcon,
   ShieldCheckIcon,
   MapPinIcon,
-  LockIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
   DownloadIcon,
@@ -165,8 +163,10 @@ const SimpleVotingInterface = ({
 
   // Filter candidates strictly for voter's jurisdiction
   const filteredCandidates = useMemo(() => {
+    const safeCandidates = Array.isArray(candidates) ? candidates : [];
+    const safeVoter = voter && typeof voter === "object" ? voter : null;
     return filterCandidatesForVoter(safeCandidates, safeVoter);
-  }, [safeCandidates, safeVoter]);
+  }, [candidates, voter]);
 
   // Group filtered candidates by position
   const candidatesByPosition = useMemo(() => {
@@ -174,12 +174,12 @@ const SimpleVotingInterface = ({
   }, [filteredCandidates]);
 
   // Check if position was already voted for
-  const isPositionVoted = (position) => {
+  const isPositionVoted = useCallback((position) => {
     if (typeof hasVotedForPosition === "function") {
       return hasVotedForPosition(position);
     }
     return false;
-  };
+  }, [hasVotedForPosition]);
 
   // Check if voter is eligible to vote for position
   const isPositionVotable = (position) => {
@@ -200,12 +200,12 @@ const SimpleVotingInterface = ({
       // All 6 positions voted: jump straight to Summary & Receipt
       setCurrentStepIndex(6);
     }
-  }, [voterInfo]);
+  }, [voterInfo, isPositionVoted]);
 
   // Total ballots voted count
   const votedBallotsCount = useMemo(() => {
     return WIZARD_BALLOT_STEPS.filter((s) => isPositionVoted(s.position)).length;
-  }, [voterInfo, hasVotedForPosition]);
+  }, [isPositionVoted]);
 
   const hasCompletedAllVotes = votedBallotsCount === 6;
 

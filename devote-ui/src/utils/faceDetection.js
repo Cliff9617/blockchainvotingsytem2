@@ -194,10 +194,12 @@ export const getBrightness = (video) => {
   }
 };
 
-export default {
+const faceDetection = {
   loadFaceDetectionModels,
   isFaceDetectionAvailable,
   detectFace,
   checkFacePosition,
-  getBrightness
+  getBrightness,
 };
+
+export default faceDetection;

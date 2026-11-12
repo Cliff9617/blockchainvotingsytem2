@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
 import {
-  POSITIONS,
   normalizePosition,
   getPositionDisplayName,
   filterCandidatesForVoter,

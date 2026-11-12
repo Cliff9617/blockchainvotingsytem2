@@ -1,7 +1,10 @@
 [build]
   base = "devote-ui"
   publish = "build"
-  command = "npm run build"
+  command = "CI=false npm run build"
+
+[build.environment]
+  CI = "false"
 
 [[redirects]]
   from = "/*"

@@ -274,8 +274,10 @@ export const generateQRCodeDataUrl = async (verificationId) => {
   }
 };
 
-export default {
+const pdfReceiptGenerator = {
   generateReceiptPDF,
   downloadReceiptPDF,
   generateQRCodeDataUrl,
 };
+
+export default pdfReceiptGenerator;

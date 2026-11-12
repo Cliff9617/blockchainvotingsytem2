@@ -163,8 +163,10 @@ export const getBase64ImageSizeKB = (base64Str) => {
   return Math.round((base64Data.length * 0.75) / 1024);
 };
 
-export default {
+const imageToBase64 = {
   fileToBase64,
   isBase64Image,
   getBase64ImageSizeKB,
 };
+
+export default imageToBase64;

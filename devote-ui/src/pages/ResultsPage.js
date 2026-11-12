@@ -2,11 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import {
   filterResultsForVoter,
-  groupCandidatesByPosition,
-  getPositionCounts,
   normalizePosition,
   POSITIONS,
-  POSITION_NAMES,
   getPositionDisplayName,
   calculateWinnersByPosition,
   getWinnerAreaDescription,
@@ -102,6 +99,7 @@ const ResultsPage = ({
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // EMPTY dependency array - runs only once on mount
 
   // Normalize candidate data

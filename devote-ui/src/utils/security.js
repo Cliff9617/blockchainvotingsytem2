@@ -36,7 +36,7 @@ export const sanitizeInput = (input) => {
   sanitized = sanitized.replace(/on\w+\s*=/gi, '');
   
   // Remove special characters that could be used for injection
-  sanitized = sanitized.replace(/[<>\"'&]/g, (char) => {
+  sanitized = sanitized.replace(/[<>"'&]/g, (char) => {
     const entities = {
       '<': '<',
       '>': '>',
@@ -482,7 +482,7 @@ export const validatePassword = (password) => {
   }
 
   // Require special character
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
     errors.push('Password must contain at least one special character');
   } else {
     strengthScore += 1;
@@ -548,7 +548,7 @@ export const hashPassword = async (password) => {
   }
 };
 
-export default {
+const security = {
   sanitizeInput,
   sanitizeObject,
   isValidWalletAddress,
@@ -571,3 +571,5 @@ export default {
   validatePassword,
   hashPassword,
 };
+
+export default security;
