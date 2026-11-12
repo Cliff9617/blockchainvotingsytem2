@@ -11,6 +11,7 @@
     "chart.js": "^4.5.1",
     "ethers": "^6.16.0",
     "firebase": "^12.11.0",
+    "firebase-admin": "^13.10.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "papaparse": "^5.5.3",

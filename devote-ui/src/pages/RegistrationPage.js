@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import { getAllCounties, getConstituenciesByCountyId, getWardsByConstituencyId } from '../data/kenyaLocations';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import {
   loadFaceDetectionModels,
   isFaceDetectionAvailable,
@@ -10,6 +10,7 @@ import {
   checkFacePosition,
 } from '../utils/faceDetection';
 import { validatePdfFile, uploadVoterIdDocument } from '../services/storageService';
+import { verifyVoterIdentity } from '../services/smileIdService';
 
 const RegistrationPage = ({
   onConnectWallet,
@@ -26,10 +27,12 @@ const RegistrationPage = ({
   const [personalDetails, setPersonalDetails] = useState({
     fullName: '',
     nationalId: '',
+    dob: '',
     pin: '',
     confirmPin: '',
   });
   const [personalErrors, setPersonalErrors] = useState({});
+  const [smileVerificationState, setSmileVerificationState] = useState(null);
 
   // Step 2: Voting Area
   const [votingArea, setVotingArea] = useState({
@@ -169,8 +172,11 @@ const RegistrationPage = ({
     }
     if (!personalDetails.nationalId.trim()) {
       errors.nationalId = 'National ID number is required';
-    } else if (!/^\d{8}$/.test(personalDetails.nationalId.trim())) {
+    } else if (!/^\d{7,9}$/.test(personalDetails.nationalId.trim())) {
       errors.nationalId = 'National ID must contain 7 to 9 digits';
+    }
+    if (!personalDetails.dob) {
+      errors.dob = 'Date of birth is required for automated identity verification';
     }
     if (!personalDetails.pin.trim()) {
       errors.pin = 'Voting PIN is required';
@@ -738,39 +744,95 @@ const RegistrationPage = ({
         console.log('STEP 3: No selfie data available');
       }
 
-      console.log('STEP 5: Building Firestore document');
+      console.log('STEP 5: Running Smile ID automated voter verification...');
+      let smileResult = { success: false, status: 'PENDING_REVIEW', jobId: null };
+      try {
+        smileResult = await verifyVoterIdentity({
+          nationalId: personalDetails.nationalId,
+          fullName: personalDetails.fullName,
+          dob: personalDetails.dob || '1995-01-01',
+          walletAddress: account || `wallet_${personalDetails.nationalId}`,
+          userId: `voter_${personalDetails.nationalId}`,
+        });
+        console.log('[RegistrationPage] Smile ID result:', smileResult);
+      } catch (smileErr) {
+        console.warn('[RegistrationPage] Smile ID verification call failed:', smileErr);
+      }
+
+      const isSmileVerified = smileResult.status === 'VERIFIED';
+      const smileStatus = isSmileVerified ? 'smile_verified' :
+                          smileResult.status === 'REJECTED' ? 'smile_rejected' : 'pending_review';
+
+      // Auto-approve if verified by Smile ID
+      const initialStatus = isSmileVerified ? 'approved' : 'pending';
+
+      console.log('STEP 6: Building Firestore document with Smile ID status:', smileStatus);
       const registrationData = {
         walletAddress: account || "",
         fullName: personalDetails.fullName,
         idNumber: personalDetails.nationalId,
+        dob: personalDetails.dob || '',
         county: votingArea.county,
         constituency: votingArea.constituency,
         ward: votingArea.ward,
         pin: personalDetails.pin,
         idDocumentUrl: idDocumentUrl,
         selfieBase64: selfieBase64,
-        status: "pending",
+        status: initialStatus,
+        smileStatus: smileStatus,
+        smileJobId: smileResult.jobId || null,
+        smileConfidence: smileResult.confidence || null,
+        smileMessage: smileResult.message || '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      console.log('STEP 6: Saving registration to Firestore...');
-      console.log('Document size estimate:', JSON.stringify(registrationData).length, 'bytes');
-      
+      console.log('STEP 7: Saving registration to Firestore...');
       const docRef = await addDoc(
         collection(db, "voterRegistrationRequests"),
         registrationData
       );
 
-      console.log('STEP 7: Firestore save completed - Document ID:', docRef.id);
-      console.log('STEP 8: Registration completed successfully');
+      // If auto-verified by Smile ID, also create the approved voter document in 'voters'
+      if (isSmileVerified) {
+        const voterDocId = (account || personalDetails.nationalId).toLowerCase();
+        try {
+          await setDoc(doc(db, 'voters', voterDocId), {
+            fullName: personalDetails.fullName,
+            idNumber: personalDetails.nationalId,
+            county: votingArea.county,
+            constituency: votingArea.constituency,
+            ward: votingArea.ward,
+            pin: personalDetails.pin,
+            walletAddress: account || "",
+            status: 'approved',
+            smileStatus: 'smile_verified',
+            smileJobId: smileResult.jobId || null,
+            approvedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            sourceRequestId: docRef.id,
+          }, { merge: true });
+          console.log('[RegistrationPage] Auto-approved voter record saved in voters collection:', voterDocId);
+        } catch (votersErr) {
+          console.warn('[RegistrationPage] Non-fatal: could not write to voters collection:', votersErr);
+        }
+      }
+
+      setSmileVerificationState({
+        status: smileStatus,
+        isVerified: isSmileVerified,
+        message: smileResult.message,
+      });
+
+      console.log('STEP 8: Firestore save completed - Document ID:', docRef.id);
+      console.log('STEP 9: Registration completed successfully');
       console.log('========================================');
 
       // Show success
       setShowSuccessModal(true);
 
       // Reset form
-      setPersonalDetails({ fullName: '', nationalId: '', pin: '', confirmPin: '' });
+      setPersonalDetails({ fullName: '', nationalId: '', dob: '', pin: '', confirmPin: '' });
       setVotingArea({ county: '', constituency: '', ward: '' });
       setIdDocument(null);
       setIdDocumentName('');
@@ -951,6 +1013,28 @@ const RegistrationPage = ({
                 {personalErrors.nationalId && (
                   <p className="mt-1 text-sm text-red-600">{personalErrors.nationalId}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date of Birth <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="dob"
+                  value={personalDetails.dob}
+                  onChange={handlePersonalChange}
+                  max={new Date(Date.now() - 18 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none ${
+                    personalErrors.dob ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
+                />
+                {personalErrors.dob && (
+                  <p className="mt-1 text-sm text-red-600">{personalErrors.dob}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Required for automated Smile ID identity verification (Must be 18+).
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1463,38 +1547,76 @@ const RegistrationPage = ({
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
+              smileVerificationState?.isVerified ? 'bg-green-100' : 'bg-blue-100'
+            }`}>
+              {smileVerificationState?.isVerified ? (
+                <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg className="w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
             </div>
             
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              Registration Submitted!
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {smileVerificationState?.isVerified ? 'Identity Verified & Registered' : 'Registration Staged for Review'}
             </h2>
-            <p className="text-gray-600 mb-6">
-              Your registration request has been sent successfully. IEBC will review it shortly and you'll be notified once approved.
+
+            {/* Smile ID Verification Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-4 bg-gray-100 text-gray-800 border border-gray-200">
+              <span className={`w-2 h-2 rounded-full ${
+                smileVerificationState?.isVerified ? 'bg-green-500' : 'bg-yellow-500'
+              }`}></span>
+              Smile ID: {smileVerificationState?.isVerified ? 'Automated KYC Verified' : 'Manual Review Staged'}
+            </div>
+
+            <p className="text-gray-600 mb-6 text-sm">
+              {smileVerificationState?.isVerified 
+                ? 'Your national identity was verified automatically through Smile ID. Your voter account is active and you may proceed directly to the voting platform.'
+                : 'Your voter registration has been submitted and queued for IEBC verification in the administrative panel.'
+              }
             </p>
             
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-blue-800">
-                <strong>Next Steps:</strong> Once your registration is approved, you'll be able to access the voting page and cast your vote.
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-left">
+              <p className="text-xs text-green-900 font-medium">
+                {smileVerificationState?.isVerified
+                  ? 'Official IEBC Voter Record: You can sign in using your Full Name, National ID, and PIN on the voting page.'
+                  : 'Notice: Once reviewed by an IEBC returning officer, your voting credentials will be activated.'
+                }
               </p>
             </div>
 
-            <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                if (onNavigate) {
-                  onNavigate('home');
-                } else {
-                  window.location.hash = '';
-                }
-              }}
-              className="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all"
-            >
-              Go to Home
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  if (onNavigate) {
+                    onNavigate('vote');
+                  } else {
+                    window.location.hash = 'vote';
+                  }
+                }}
+                className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all text-sm"
+              >
+                Proceed to Vote
+              </button>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  if (onNavigate) {
+                    onNavigate('home');
+                  } else {
+                    window.location.hash = '';
+                  }
+                }}
+                className="px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all text-sm"
+              >
+                Home
+              </button>
+            </div>
           </div>
         </div>
       )}

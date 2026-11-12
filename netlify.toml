@@ -2,9 +2,15 @@
   base = "devote-ui"
   publish = "build"
   command = "CI=false npm run build"
+  functions = "netlify/functions"
 
 [build.environment]
   CI = "false"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*"

@@ -6,19 +6,19 @@ import config from '../config';
 
 const AdminVoterVerification = () => {
   const [pendingVoters, setPendingVoters] = useState([]);
+  const [selectedTab, setSelectedTab] = useState('all'); // 'all' | 'verified' | 'review' | 'rejected'
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [selectedVoter, setSelectedVoter] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Fetch pending voters from Firestore
+  // Fetch registration requests from Firestore
   const fetchPendingVoters = async () => {
     try {
       setLoading(true);
       const votersRef = collection(db, 'voterRegistrationRequests');
-      const q = query(votersRef, where('status', '==', 'pending'));
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(votersRef);
       
       const voters = [];
       querySnapshot.forEach((doc) => {
@@ -28,6 +28,13 @@ const AdminVoterVerification = () => {
         });
       });
       
+      // Sort by creation date descending
+      voters.sort((a, b) => {
+        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+
       setPendingVoters(voters);
     } catch (error) {
       console.error('Error fetching pending voters:', error);
@@ -316,6 +323,50 @@ const AdminVoterVerification = () => {
         </div>
       )}
 
+      {/* Tabs / Filter Controls */}
+      <div className="flex border-b border-gray-200 mb-6 space-x-2">
+        <button
+          onClick={() => setSelectedTab('all')}
+          className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            selectedTab === 'all'
+              ? 'border-green-600 text-green-700 font-semibold'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          All Requests ({pendingVoters.length})
+        </button>
+        <button
+          onClick={() => setSelectedTab('verified')}
+          className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            selectedTab === 'verified'
+              ? 'border-green-600 text-green-700 font-semibold'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Smile ID Verified ({pendingVoters.filter(v => v.smileStatus === 'smile_verified' || v.status === 'approved').length})
+        </button>
+        <button
+          onClick={() => setSelectedTab('review')}
+          className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            selectedTab === 'review'
+              ? 'border-green-600 text-green-700 font-semibold'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Pending Review ({pendingVoters.filter(v => v.smileStatus === 'pending_review' || (v.status === 'pending' && !v.smileStatus)).length})
+        </button>
+        <button
+          onClick={() => setSelectedTab('rejected')}
+          className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+            selectedTab === 'rejected'
+              ? 'border-green-600 text-green-700 font-semibold'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Rejected ({pendingVoters.filter(v => v.status === 'rejected' || v.smileStatus === 'smile_rejected').length})
+        </button>
+      </div>
+
       {/* Loading State */}
       {loading ? (
         <div className="text-center py-8">
@@ -341,6 +392,9 @@ const AdminVoterVerification = () => {
                   Wallet Address
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Smile ID KYC
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Location
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -352,7 +406,18 @@ const AdminVoterVerification = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {pendingVoters.map((voter) => (
+              {pendingVoters.filter(voter => {
+                if (selectedTab === 'verified') {
+                  return voter.smileStatus === 'smile_verified' || voter.status === 'approved';
+                }
+                if (selectedTab === 'review') {
+                  return voter.smileStatus === 'pending_review' || (voter.status === 'pending' && !voter.smileStatus);
+                }
+                if (selectedTab === 'rejected') {
+                  return voter.status === 'rejected' || voter.smileStatus === 'smile_rejected';
+                }
+                return true;
+              }).map((voter) => (
                 <tr key={voter.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{voter.fullName}</div>
@@ -376,6 +441,33 @@ const AdminVoterVerification = () => {
                       >
                         View on Etherscan
                       </a>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {voter.smileStatus === 'smile_verified' || voter.status === 'approved' ? (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                        <span className="w-1.5 h-1.5 mr-1.5 bg-green-500 rounded-full"></span>
+                        Verified (Auto)
+                      </span>
+                    ) : voter.smileStatus === 'smile_rejected' || voter.status === 'rejected' ? (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                        <span className="w-1.5 h-1.5 mr-1.5 bg-red-500 rounded-full"></span>
+                        Failed / Mismatch
+                      </span>
+                    ) : voter.smileStatus === 'pending_review' ? (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                        <span className="w-1.5 h-1.5 mr-1.5 bg-yellow-500 rounded-full"></span>
+                        Pending Review
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                        Standard
+                      </span>
+                    )}
+                    {voter.smileJobId && (
+                      <div className="text-[10px] text-gray-400 font-mono mt-1">
+                        Job: {voter.smileJobId.substring(0, 12)}...
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
