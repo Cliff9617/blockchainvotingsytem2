@@ -1,4 +1,5 @@
 import React from "react";
+import { AwardIcon } from "./common/Icons";
 
 const WinnerSection = ({
   winnerResult,
@@ -45,7 +46,9 @@ const WinnerSection = ({
             <span className="text-sm font-medium">Vote Percentage</span>
             <span className="ml-2 text-lg font-bold">{percentage}%</span>
           </div>
-          <div className="text-6xl">🏆</div>
+          <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+            <AwardIcon className="w-8 h-8 text-white" />
+          </div>
         </div>
       </div>
     );

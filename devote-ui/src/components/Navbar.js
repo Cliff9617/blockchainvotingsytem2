@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { LockIcon } from './common/Icons';
 
-const Navbar = ({ onConnectWallet, isConnected, account, onNavigate }) => {
+const Navbar = ({ onConnectWallet, isConnected, account, onNavigate, resultsLocked = false }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeLink, setActiveLink] = useState('Home');
 
@@ -130,13 +131,18 @@ const Navbar = ({ onConnectWallet, isConnected, account, onNavigate }) => {
               <button
                 key={link}
                 onClick={() => handleNavClick(link)}
-                className={`text-sm font-medium transition-colors duration-200 ${
+                className={`inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-200 ${
                   activeLink === link
                     ? 'text-dark-green-700 border-b-2 border-dark-green-500 pb-1'
                     : 'text-gray-600 hover:text-dark-green-600'
                 }`}
               >
-                {link}
+                <span>{link}</span>
+                {link === 'Results' && resultsLocked && (
+                  <span title="Results sealed until voting complete">
+                    <LockIcon className="w-3.5 h-3.5 text-amber-600" />
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -198,13 +204,19 @@ const Navbar = ({ onConnectWallet, isConnected, account, onNavigate }) => {
               <button
                 key={link}
                 onClick={() => handleNavClick(link)}
-                className={`block w-full text-left px-3 py-2 rounded-md text-base font-medium ${
+                className={`flex items-center justify-between w-full px-3 py-2.5 rounded-md text-base font-medium ${
                   activeLink === link
                     ? 'bg-dark-green-50 text-dark-green-700'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-dark-green-600'
                 }`}
               >
-                {link}
+                <span>{link}</span>
+                {link === 'Results' && resultsLocked && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    <LockIcon className="w-3 h-3 text-amber-600" />
+                    <span>Sealed</span>
+                  </span>
+                )}
               </button>
             ))}
             <div className="pt-4 mt-2 border-t border-gray-100">

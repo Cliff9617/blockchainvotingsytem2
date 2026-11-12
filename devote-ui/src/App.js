@@ -21,6 +21,7 @@ import useSuperAdmin from "./hooks/useSuperAdmin";
 import { ROLE_NAMES } from "./config";
 import Loading from "./components/Loading";
 import AIVoterAssistant from "./components/ai/AIVoterAssistant";
+import ResultsGate from "./components/ResultsGate";
 
 function App() {
   const {
@@ -464,6 +465,10 @@ function App() {
 
   // Main application layout
   const renderCurrentPage = () => {
+    const isOfficial = Boolean(canAccessAdmin || isAuditor || isSuperAdmin || isNationalCommissioner);
+    const hasVotedOrFinished = Boolean(voterInfo?.hasVoted || voterInfo?.hasVotedAll || voterInfo?.hasVotedAny);
+    const canViewResults = isOfficial || electionEnded || hasVotedOrFinished;
+
     switch (currentPage) {
       case 'about':
         return <AboutPage {...baseProps} />;
@@ -474,8 +479,14 @@ function App() {
       case 'vote':
         return <VotePage {...votePageProps} />;
       case 'results':
+        if (!canViewResults) {
+          return <ResultsGate onNavigateToVote={() => handleNavigate('vote')} />;
+        }
         return <ResultsPage {...resultsPageProps} />;
       case 'national-results':
+        if (!canViewResults) {
+          return <ResultsGate onNavigateToVote={() => handleNavigate('vote')} />;
+        }
         return <NationalResultsCenter {...nationalResultsProps} />;
       case 'admin':
         if (canAccessAdmin) {

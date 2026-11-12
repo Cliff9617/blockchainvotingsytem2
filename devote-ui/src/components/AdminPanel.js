@@ -276,7 +276,7 @@ const AdminPanel = ({
       // We pass empty strings for county, constituency, ward since AdminPanel
       // doesn't have location fields for voter registration
       await onRegisterVoter(value, '', '', '');
-      setStatus("✅ Voter registered successfully");
+      setStatus("Voter registered successfully");
       setVoterAddress("");
       await onRefresh?.();
     } catch (err) {
@@ -430,7 +430,7 @@ const AdminPanel = ({
 
       console.log('[AdminPanel] Candidate added successfully to blockchain');
 
-      setStatus("✅ Candidate added successfully");
+      setStatus("Candidate added successfully");
       setCandidateData({
         name: "",
         party: "",
@@ -463,7 +463,7 @@ const AdminPanel = ({
       setStatus("Waiting for MetaMask confirmation...");
       const result = await onStartElection();
       // Only mark success if the on-chain read confirms the election actually started
-      setStatus(result?.message || "✅ Election started successfully");
+      setStatus(result?.message || "Election started successfully");
       await onRefresh?.();
     } catch (err) {
       showError(err);
@@ -483,7 +483,7 @@ const AdminPanel = ({
     try {
       setStatus("Waiting for MetaMask confirmation...");
       const result = await onEndElection();
-      setStatus(result?.message || "✅ Election ended successfully");
+      setStatus(result?.message || "Election ended successfully");
       await onRefresh?.();
     } catch (err) {
       showError(err);
@@ -510,7 +510,7 @@ const AdminPanel = ({
       setStatus("Uploading and processing voter list...");
       const result = await onBulkRegisterVoters(file);
       setStatus(
-        `✅ Bulk upload completed${
+        `Bulk upload completed${
           result?.count ? `: ${result.count} voter(s) registered` : ""
         }`
       );
@@ -599,7 +599,7 @@ const AdminPanel = ({
         console.log("Admin user saved to localStorage");
       }
 
-      setStatus("✅ Admin user created successfully");
+      setStatus("Admin user created successfully");
       setAdminUserData({
         username: "",
         walletAddress: "",
@@ -632,7 +632,7 @@ const AdminPanel = ({
         }
       }
       await fetchAdminUsers();
-      setStatus("✅ Admin user deactivated");
+      setStatus("Admin user deactivated");
     } catch (err) {
       showError(err);
     }
@@ -646,7 +646,7 @@ const AdminPanel = ({
   const hasElectionLifecycleAuthority = (typeof isSuperAdmin !== 'undefined') ? isSuperAdmin : isMainAdmin;
   
   // Debug logging for lifecycle authority
-  console.log('[AdminPanel] 🔑 Lifecycle authority check:', {
+  console.log('[AdminPanel] Lifecycle authority check:', {
     isSuperAdmin,
     isSuperAdminVerified,
     hasElectionLifecycleAuthority,
@@ -673,8 +673,28 @@ const AdminPanel = ({
 
   // Sidebar navigation items
   const sidebarItems = [
-    { id: "dashboard", label: "Dashboard", icon: "📊" },
-    { id: "officials", label: "Election Officials", icon: "👥" },
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+      ),
+    },
+    {
+      id: "officials",
+      label: "Election Officials",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -736,7 +756,7 @@ const AdminPanel = ({
             {/* Action/Error Status - surface errors from lifecycle actions instead of hiding them */}
             {status && (
               <div className={`mb-4 p-4 rounded-lg border ${
-                status.startsWith("✅") || status.toLowerCase().includes("success")
+                status.toLowerCase().includes("done_") || status.toLowerCase().includes("success")
                   ? "bg-green-50 border-green-200 text-green-800"
                   : "bg-red-50 border-red-200 text-red-800"
               }`}>
@@ -747,7 +767,7 @@ const AdminPanel = ({
             {showAdminWarning && (
               <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
-                  ⚠️ This wallet has dashboard access, but blockchain admin actions require the main contract admin wallet.
+                  Warning: This wallet has dashboard access, but blockchain admin actions require the main contract admin wallet.
                 </p>
                 <p className="text-sm text-yellow-700 mt-1">
                   Main admin: {adminAddress || "Not detected"}
@@ -982,7 +1002,7 @@ const AdminPanel = ({
                   <h3 className="text-lg font-semibold text-green-900">Election Lifecycle Controls</h3>
                   <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-100 border border-green-300 rounded-full">
                     <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-                    <span className="text-xs font-semibold text-green-800">🟢 Super Admin</span>
+                    <span className="text-xs font-semibold text-green-800">Super Admin</span>
                   </div>
                 </div>
                 <p className="text-sm text-green-700 mb-4">Election Lifecycle Authority — Only you can control the election lifecycle.</p>
@@ -992,14 +1012,14 @@ const AdminPanel = ({
                     disabled={isBusy || electionStarted}
                     className="p-6 bg-green-100 rounded-xl hover:shadow-lg disabled:opacity-50 text-left"
                   >
-                    <span className="text-lg font-semibold">{electionStarted ? "Election Already Started" : "▶ Start Election"}</span>
+                    <span className="text-lg font-semibold">{electionStarted ? "Election Already Started" : "Start Election"}</span>
                   </button>
                   <button
                     onClick={handleEndElection}
                     disabled={isBusy || !electionStarted || electionEnded}
                     className="p-6 bg-red-100 rounded-xl hover:shadow-lg disabled:opacity-50 text-left"
                   >
-                    <span className="text-lg font-semibold">{electionEnded ? "Election Already Ended" : "⏹ End Election"}</span>
+                    <span className="text-lg font-semibold">{electionEnded ? "Election Already Ended" : "End Election"}</span>
                   </button>
                 </div>
               </div>
@@ -1103,7 +1123,7 @@ const AdminPanel = ({
                     {candidates.length === 0 && (
                       <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-left">
                         <p className="text-sm text-red-800 font-medium">
-                          ⚠️ No candidates are registered on the blockchain yet.
+                          No candidates are registered on the blockchain yet.
                         </p>
                         <p className="text-sm text-red-700 mt-1">
                           The contract requires at least one candidate (candidatesCount &gt; 0) before the
@@ -1144,7 +1164,7 @@ const AdminPanel = ({
                     <h3 className="text-xl font-bold text-gray-900 mb-2">End Election?</h3>
                     <p className="text-gray-600 mb-4">Total votes cast: <strong>{totalVotesCount}</strong>.</p>
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
-                      <p className="text-sm text-red-800 font-medium">⚠️ WARNING: This action cannot be reversed.</p>
+                      <p className="text-sm text-red-800 font-medium">WARNING: This action cannot be reversed.</p>
                     </div>
                   </div>
                   <div className="flex gap-3">

@@ -221,7 +221,21 @@ export const calculateWinnersByPosition = (candidates, voter = null) => {
   return winners;
 };
 
+export const formatCandidateDisplayName = (candidate, candidateIndex = null) => {
+  if (!candidate) return 'Candidate';
+  const pos = normalizePosition(candidate.position);
+  if (pos === POSITIONS.PRESIDENT) {
+    if (/^Candidate\s+\d+$/i.test(candidate.name)) {
+      return candidate.name;
+    }
+    const num = candidateIndex !== null ? candidateIndex : (candidate.candidateNumber || candidate.blockchainId || candidate.id || 1);
+    return `Candidate ${num}`;
+  }
+  return candidate.name || `Candidate ${candidate.id || 1}`;
+};
+
 export default {
+  formatCandidateDisplayName,
   normalizeText,
   resolveVoterCountyName,
   normalizePosition,

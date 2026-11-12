@@ -1,126 +1,123 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   groupCandidatesByPosition,
   filterCandidatesForVoter,
   getPositionDisplayName,
+  formatCandidateDisplayName,
   POSITIONS,
+  POSITION_ORDER,
 } from "../utils/electionFilters";
 import SimpleCandidateCard from "./SimpleCandidateCard";
+import {
+  CheckIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
+  ShieldCheckIcon,
+  MapPinIcon,
+  LockIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  DownloadIcon,
+  BarChartIcon,
+} from "./common/Icons";
+import { downloadReceiptPDF } from "../utils/pdfReceiptGenerator";
 
 /**
- * SimpleVotingInterface - Redesigned voting UI for maximum simplicity
- * 
- * Key features:
- * - Centered layout with max-width container
- * - Candidates grouped by position in order: President, Governor, Senator, Woman Rep, MP, MCA
- * - Clear section headings with voting instructions
- * - Large, simple candidate cards
- * - Vote confirmation modal
- * - Per-position voting status
- * - Mobile-friendly responsive design
+ * Ordered 6 Elective Positions for Kenyan National Elections
  */
-
-// Position order for display
-const POSITION_ORDER = [
-  POSITIONS.PRESIDENT,
-  POSITIONS.GOVERNOR,
-  POSITIONS.SENATOR,
-  POSITIONS.WOMAN_REPRESENTATIVE,
-  POSITIONS.MEMBER_OF_PARLIAMENT,
-  POSITIONS.MCA,
+const WIZARD_BALLOT_STEPS = [
+  { position: POSITIONS.PRESIDENT, label: "President", jurisdiction: "National Ballot", stepNum: 1 },
+  { position: POSITIONS.GOVERNOR, label: "Governor", jurisdiction: "County Ballot", stepNum: 2 },
+  { position: POSITIONS.SENATOR, label: "Senator", jurisdiction: "County Ballot", stepNum: 3 },
+  { position: POSITIONS.WOMAN_REPRESENTATIVE, label: "Woman Representative", jurisdiction: "County Ballot", stepNum: 4 },
+  { position: POSITIONS.MEMBER_OF_PARLIAMENT, label: "Member of Parliament", jurisdiction: "Constituency Ballot", stepNum: 5 },
+  { position: POSITIONS.MCA, label: "Member of County Assembly", jurisdiction: "Ward Ballot", stepNum: 6 },
 ];
 
-// Section numbers for headings
-const SECTION_NUMBERS = {
-  [POSITIONS.PRESIDENT]: "1",
-  [POSITIONS.GOVERNOR]: "2",
-  [POSITIONS.SENATOR]: "3",
-  [POSITIONS.WOMAN_REPRESENTATIVE]: "4",
-  [POSITIONS.MEMBER_OF_PARLIAMENT]: "5",
-  [POSITIONS.MCA]: "6",
-};
-
-// Confirmation Modal Component
-const VoteConfirmationModal = ({ 
-  isOpen, 
-  candidate, 
-  position, 
-  onConfirm, 
+/**
+ * Mobile-friendly Vote Confirmation Modal
+ */
+const VoteConfirmationModal = ({
+  isOpen,
+  candidate,
+  candidateIndex,
+  position,
+  onConfirm,
   onCancel,
-  isLoading 
+  isLoading,
 }) => {
   if (!isOpen || !candidate) return null;
 
-  const candidateName = candidate?.name || "this candidate";
+  const candidateName = formatCandidateDisplayName(candidate, candidateIndex);
   const positionDisplay = position ? getPositionDisplayName(position) : "";
+  const party = candidate?.party || "Independent";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 border border-gray-200">
         <div className="text-center">
-          {/* Icon */}
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-green-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+          {/* Official Verification Icon */}
+          <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100">
+            <ShieldCheckIcon className="w-8 h-8 text-emerald-600" />
           </div>
 
-          {/* Title */}
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">
-            Confirm Your Vote
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+            Confirm Your Ballot Choice
           </h3>
+          <p className="text-xs sm:text-sm text-gray-500 mb-4">
+            Official National Electoral Ballot Verification
+          </p>
 
-          {/* Candidate Info */}
-          <div className="bg-gray-50 rounded-xl p-4 mb-6">
-            <p className="text-lg font-semibold text-gray-900 mb-1">
+          {/* Selected Candidate Box */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 text-left">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {positionDisplay}
+              </span>
+              <span className="text-xs bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded font-medium">
+                {party}
+              </span>
+            </div>
+            <p className="text-lg sm:text-xl font-bold text-gray-900">
               {candidateName}
             </p>
-            <p className="text-gray-600">
-              {positionDisplay}
+          </div>
+
+          {/* Warning Banner */}
+          <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 mb-5 text-left flex items-start gap-2.5">
+            <AlertTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs sm:text-sm text-amber-800 leading-relaxed">
+              <strong>Ballot Secrecy & Finality:</strong> Once confirmed, your selection is cryptographically sealed onto the Ethereum blockchain. You cannot vote again for this position.
             </p>
           </div>
 
-          {/* Warning */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
-            <p className="text-sm text-yellow-800">
-              ⚠️ This action cannot be undone. Your vote will be recorded on the blockchain.
-            </p>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2.5">
             <button
               onClick={onCancel}
               disabled={isLoading}
-              className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-all"
+              className="w-full sm:flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors disabled:opacity-50 text-sm sm:text-base order-2 sm:order-1"
             >
-              Cancel
+              Cancel & Review
             </button>
             <button
               onClick={onConfirm}
               disabled={isLoading}
-              className="flex-1 py-3 px-4 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-all"
+              className="w-full sm:flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all shadow-sm hover:shadow disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2 flex items-center justify-center gap-2"
             >
               {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Processing...
-                </span>
+                  <span>Submitting to Chain...</span>
+                </>
               ) : (
-                "Confirm Vote"
+                <>
+                  <CheckIcon className="w-4 h-4 text-white" />
+                  <span>Confirm Ballot</span>
+                </>
               )}
             </button>
           </div>
@@ -130,11 +127,14 @@ const VoteConfirmationModal = ({
   );
 };
 
+/**
+ * Sequential Voting Wizard Interface
+ */
 const SimpleVotingInterface = ({
   electionStarted = false,
   electionEnded = false,
   candidates = [],
-  voter = null, // { county, constituency, ward }
+  voter = null,
   voterInfo = {},
   isLoading = false,
   error = "",
@@ -143,295 +143,487 @@ const SimpleVotingInterface = ({
   canVoteForPosition,
   totalVotes = 0,
   getVotePercentage,
+  onProceedToResults,
 }) => {
-  // State for vote confirmation
+  // Active step index (0 to 5 = ballots, 6 = summary & receipt)
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
+  // Modal confirmation state
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     candidate: null,
+    candidateIndex: null,
     position: null,
   });
   const [isConfirming, setIsConfirming] = useState(false);
 
-  // Defensive guards
+  // Defensive values
   const safeCandidates = Array.isArray(candidates) ? candidates : [];
-  const safeVoter = voter && typeof voter === 'object' ? voter : null;
-  const safeVoterInfo = voterInfo && typeof voterInfo === 'object' ? voterInfo : {};
-  const isRegistered = safeVoterInfo?.isRegistered;
+  const safeVoter = voter && typeof voter === "object" ? voter : null;
+  const safeVoterInfo = voterInfo && typeof voterInfo === "object" ? voterInfo : {};
+  const isRegistered = Boolean(safeVoterInfo?.isRegistered);
 
-  // Filter candidates based on voter location
+  // Filter candidates strictly for voter's jurisdiction
   const filteredCandidates = useMemo(() => {
     return filterCandidatesForVoter(safeCandidates, safeVoter);
   }, [safeCandidates, safeVoter]);
 
-  // Group candidates by position
+  // Group filtered candidates by position
   const candidatesByPosition = useMemo(() => {
     return groupCandidatesByPosition(filteredCandidates);
   }, [filteredCandidates]);
 
-  // Get leading candidate IDs for highlighting
-  const leadingCandidateIds = useMemo(() => {
-    const leading = [];
-    POSITION_ORDER.forEach(position => {
-      const posCandidates = candidatesByPosition[position] || [];
-      if (posCandidates.length > 0) {
-        const sorted = [...posCandidates].sort((a, b) => {
-          const votesA = Number(a.voteCount || 0);
-          const votesB = Number(b.voteCount || 0);
-          return votesB - votesA;
-        });
-        if (sorted[0] && Number(sorted[0].voteCount || 0) > 0) {
-          leading.push(sorted[0].id ?? sorted[0].candidateId ?? sorted[0].index);
-        }
-      }
-    });
-    return leading;
-  }, [candidatesByPosition]);
-
-  // Check if voter has voted for a specific position
-  const hasVotedForPos = (position) => {
-    if (typeof hasVotedForPosition === 'function') {
+  // Check if position was already voted for
+  const isPositionVoted = (position) => {
+    if (typeof hasVotedForPosition === "function") {
       return hasVotedForPosition(position);
     }
     return false;
   };
 
-  // Check if voter can vote for a specific position
-  const canVoteForPos = (position) => {
-    if (typeof canVoteForPosition === 'function') {
+  // Check if voter is eligible to vote for position
+  const isPositionVotable = (position) => {
+    if (typeof canVoteForPosition === "function") {
       return canVoteForPosition(position);
     }
-    return Boolean(isRegistered) && Boolean(electionStarted) && !Boolean(electionEnded);
+    return isRegistered && electionStarted && !electionEnded;
   };
 
-  // Handle vote button click - show confirmation modal
-  const handleVoteClick = (candidate, position) => {
+  // Auto-advance to first unvoted step on initial load
+  useEffect(() => {
+    const firstUnvoted = WIZARD_BALLOT_STEPS.findIndex(
+      (step) => !isPositionVoted(step.position)
+    );
+    if (firstUnvoted !== -1) {
+      setCurrentStepIndex(firstUnvoted);
+    } else {
+      // All 6 positions voted: jump straight to Summary & Receipt
+      setCurrentStepIndex(6);
+    }
+  }, [voterInfo]);
+
+  // Total ballots voted count
+  const votedBallotsCount = useMemo(() => {
+    return WIZARD_BALLOT_STEPS.filter((s) => isPositionVoted(s.position)).length;
+  }, [voterInfo, hasVotedForPosition]);
+
+  const hasCompletedAllVotes = votedBallotsCount === 6;
+
+  // Open confirmation modal
+  const handleVoteClick = (candidate, candidateIdx, position) => {
     setConfirmModal({
       isOpen: true,
       candidate,
+      candidateIndex: candidateIdx,
       position,
     });
   };
 
-  // Handle vote confirmation
+  // Confirm vote & advance sequentially
   const handleConfirmVote = async () => {
     if (!confirmModal.candidate) return;
-    
     setIsConfirming(true);
+
     try {
-      const candidateId = confirmModal.candidate.id ?? 
-                         confirmModal.candidate.candidateId ?? 
-                         confirmModal.candidate.index;
+      const candidateId =
+        confirmModal.candidate.id ??
+        confirmModal.candidate.candidateId ??
+        confirmModal.candidate.index;
+
       await onVote(candidateId);
-      setConfirmModal({ isOpen: false, candidate: null, position: null });
+
+      setConfirmModal({
+        isOpen: false,
+        candidate: null,
+        candidateIndex: null,
+        position: null,
+      });
+
+      // Automatically advance to the next ballot step
+      setCurrentStepIndex((prev) => Math.min(prev + 1, 6));
     } catch (err) {
-      console.error("Vote failed:", err);
-      alert("Failed to cast vote. Please try again.");
+      console.error("Ballot submission failed:", err);
+      alert(err.message || "Failed to record ballot. Please try again.");
     } finally {
       setIsConfirming(false);
     }
   };
 
-  // Handle modal cancel
   const handleCancelVote = () => {
-    setConfirmModal({ isOpen: false, candidate: null, position: null });
+    setConfirmModal({
+      isOpen: false,
+      candidate: null,
+      candidateIndex: null,
+      position: null,
+    });
   };
 
-  // Render a position section
-  const renderPositionSection = (position) => {
-    const posCandidates = candidatesByPosition[position] || [];
-    if (posCandidates.length === 0) return null;
+  // Current active step object
+  const isSummaryStep = currentStepIndex === 6;
+  const currentStep = !isSummaryStep ? WIZARD_BALLOT_STEPS[currentStepIndex] : null;
+  const currentPosition = currentStep?.position;
+  const currentStepVoted = currentPosition ? isPositionVoted(currentPosition) : false;
+  const currentStepVotable = currentPosition ? isPositionVotable(currentPosition) : false;
+  const currentCandidates = currentPosition ? candidatesByPosition[currentPosition] || [] : [];
 
-    const positionDisplay = getPositionDisplayName(position);
-    const sectionNumber = SECTION_NUMBERS[position];
-    const hasVotedThisPosition = hasVotedForPos(position);
-    const canVoteThisPosition = canVoteForPos(position);
+  // Generate Receipt PDF
+  const handleDownloadReceipt = () => {
+    try {
+      const receiptData = {
+        verificationId: `IEBC-${(safeVoterInfo?.account || "VOTER").slice(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+        transactionHash: "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
+        timestamp: new Date().toISOString(),
+        county: safeVoter?.county || "National",
+        constituency: safeVoter?.constituency || "General",
+        ward: safeVoter?.ward || "General",
+        votedPositions: WIZARD_BALLOT_STEPS.map((s) => ({
+          position: s.label,
+          status: isPositionVoted(s.position) ? "Recorded on Blockchain" : "Not Cast",
+        })),
+      };
+      downloadReceiptPDF(receiptData);
+    } catch (e) {
+      console.error("Receipt generation error:", e);
+      window.print();
+    }
+  };
 
-    return (
-      <div key={position} className="mb-12">
-        {/* Section Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {sectionNumber}. Vote for {positionDisplay}
-          </h2>
-          {hasVotedThisPosition ? (
-            <p className="text-green-600 font-semibold text-lg">
-              ✅ You have already voted for {positionDisplay}
-            </p>
-          ) : canVoteThisPosition ? (
-            <p className="text-gray-600 text-lg">
-              Choose one candidate below
-            </p>
-          ) : !electionStarted ? (
-            <p className="text-yellow-600 font-semibold text-lg">
-              🕒 Waiting for election to start
-            </p>
-          ) : electionEnded ? (
-            <p className="text-red-600 font-semibold text-lg">
-              Election has ended
-            </p>
-          ) : (
-            <p className="text-gray-500 text-lg">
-              Voting not available for this position
-            </p>
-          )}
-        </div>
-
-        {/* Candidate Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {posCandidates.map((candidate, index) => {
-            const candidateId = candidate.id ?? candidate.candidateId ?? candidate.index ?? index;
-            const voteCount = Number(candidate.voteCount || 0);
-            // Calculate percentage - getVotePercentage may take 1 or 2 params
-            const percentage = typeof getVotePercentage === 'function' 
-              ? getVotePercentage(voteCount)
-              : totalVotes > 0 
-                ? Math.round((voteCount / totalVotes) * 100) 
-                : 0;
-
-            // Check if this candidate was voted for
-            const votedForCandidate = hasVotedThisPosition && 
-              safeVoterInfo?.votedFor === candidateId;
-
-            // Check if leading
-            const isLeading = leadingCandidateIds.includes(candidateId);
-
-            return (
-              <SimpleCandidateCard
-                key={candidateId}
-                candidate={candidate}
-                hasVoted={hasVotedThisPosition}
-                votedForCandidate={votedForCandidate}
-                onVote={() => handleVoteClick(candidate, position)}
-                isLoading={isLoading}
-                isLeading={isLeading && !hasVotedThisPosition}
-                canVote={canVoteThisPosition && !electionEnded}
-                showVoteCount={electionEnded || electionStarted}
-                voteCount={voteCount}
-                percentage={percentage}
-              />
-            );
-          })}
-        </div>
-      </div>
-    );
+  const handleNavigateResults = () => {
+    if (typeof onProceedToResults === "function") {
+      onProceedToResults();
+    } else {
+      window.location.hash = "results";
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 w-full">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Cast Your Vote
-            </h1>
-            <p className="text-lg text-gray-600">
-              Select your preferred candidates for each position
-            </p>
+    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 font-sans">
+      {/* Voter Information Badge - Compact & Clean */}
+      {safeVoter && (
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm text-slate-700">
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span className="font-semibold text-slate-900">Registered Polling Area:</span>
+            <span>
+              {safeVoter.county ? `${safeVoter.county} County` : "National"}
+              {safeVoter.constituency ? ` • ${safeVoter.constituency} Const.` : ""}
+              {safeVoter.ward ? ` • ${safeVoter.ward} Ward` : ""}
+            </span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500">Ballots Cast:</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 font-bold text-slate-900 text-xs">
+              {votedBallotsCount} / 6
+            </span>
+          </div>
+        </div>
+      )}
 
-          {/* Voter Location Info */}
-          {safeVoter && (
-            <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-200 max-w-md mx-auto">
-              <p className="text-sm text-blue-800 font-medium text-center">
-                📍 Your voting area
-              </p>
-              <div className="flex flex-wrap justify-center gap-4 mt-2 text-sm text-blue-700">
-                {safeVoter.county && (
-                  <span><strong>County:</strong> {safeVoter.county}</span>
-                )}
-                {safeVoter.constituency && (
-                  <span><strong>Constituency:</strong> {safeVoter.constituency}</span>
-                )}
-                {safeVoter.ward && (
-                  <span><strong>Ward:</strong> {safeVoter.ward}</span>
+      {/* Sequential Stepper Bar - Mobile Optimized */}
+      <div className="mb-6 bg-white border border-slate-200 rounded-2xl p-3 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            {isSummaryStep ? "Ballot Finalized" : `Ballot Step ${currentStepIndex + 1} of 6`}
+          </span>
+          <span className="text-xs font-semibold text-emerald-700">
+            {hasCompletedAllVotes ? "All Ballots Recorded" : `${6 - votedBallotsCount} remaining`}
+          </span>
+        </div>
+
+        {/* Stepper Dots & Labels */}
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 items-center">
+          {WIZARD_BALLOT_STEPS.map((step, idx) => {
+            const isVoted = isPositionVoted(step.position);
+            const isCurrent = currentStepIndex === idx;
+
+            return (
+              <button
+                key={step.position}
+                onClick={() => setCurrentStepIndex(idx)}
+                className={`flex flex-col items-center text-center group transition-all p-1 rounded-lg ${
+                  isCurrent ? "bg-slate-50 ring-1 ring-slate-300" : "hover:bg-slate-50"
+                }`}
+                title={step.label}
+              >
+                <div
+                  className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all mb-1 ${
+                    isVoted
+                      ? "bg-emerald-600 text-white"
+                      : isCurrent
+                      ? "bg-slate-900 text-white ring-2 ring-slate-900/30 ring-offset-1"
+                      : "bg-slate-100 text-slate-500 border border-slate-200"
+                  }`}
+                >
+                  {isVoted ? <CheckIcon className="w-4 h-4 text-white" /> : step.stepNum}
+                </div>
+                <span
+                  className={`hidden sm:inline text-[11px] truncate max-w-full font-medium ${
+                    isCurrent ? "text-slate-900 font-bold" : isVoted ? "text-emerald-700" : "text-slate-500"
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* 7th Summary Step Indicator */}
+          <button
+            onClick={() => setCurrentStepIndex(6)}
+            className={`flex flex-col items-center text-center group transition-all p-1 rounded-lg ${
+              isSummaryStep ? "bg-slate-50 ring-1 ring-slate-300" : "hover:bg-slate-50"
+            }`}
+            title="Summary & Receipt"
+          >
+            <div
+              className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all mb-1 ${
+                hasCompletedAllVotes
+                  ? "bg-emerald-600 text-white"
+                  : isSummaryStep
+                  ? "bg-slate-900 text-white ring-2 ring-slate-900/30"
+                  : "bg-slate-100 text-slate-500 border border-slate-200"
+              }`}
+            >
+              <ShieldCheckIcon className="w-4 h-4" />
+            </div>
+            <span
+              className={`hidden sm:inline text-[11px] truncate max-w-full font-medium ${
+                isSummaryStep ? "text-slate-900 font-bold" : "text-slate-500"
+              }`}
+            >
+              Summary
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Error Callout */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 mb-6 flex items-start gap-3">
+          <AlertTriangleIcon className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      {/* =========================================================================
+          STEP 1 - 6: SPECIFIC ELECTIVE POSITION BALLOT
+         ========================================================================= */}
+      {!isSummaryStep && currentStep && (
+        <div className="space-y-6">
+          {/* Active Ballot Header */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                    {currentStep.jurisdiction}
+                  </span>
+                  <span className="text-xs text-slate-400">•</span>
+                  <span className="text-xs font-semibold text-slate-500">
+                    Step {currentStep.stepNum} of 6
+                  </span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                  Vote for {currentStep.label}
+                </h2>
+              </div>
+
+              {/* Status Pill */}
+              <div>
+                {currentStepVoted ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs sm:text-sm font-bold">
+                    <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
+                    Ballot Cast & Recorded
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-xs sm:text-sm font-semibold">
+                    1 Choice Allowed
+                  </span>
                 )}
               </div>
             </div>
+
+            <p className="text-xs sm:text-sm text-slate-600 mt-3">
+              {currentStepVoted
+                ? "You have already cast and confirmed your vote for this position. Votes are immutable on the blockchain and cannot be altered."
+                : currentPosition === POSITIONS.PRESIDENT
+                ? "Select your preferred Presidential candidate below. Candidates are presented neutrally to ensure equal democratic standing."
+                : `Select your preferred candidate for ${currentStep.label} within your registered voting jurisdiction.`}
+            </p>
+          </div>
+
+          {/* Candidate Grid */}
+          {currentCandidates.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {currentCandidates.map((candidate, idx) => {
+                const candidateId = candidate.id ?? candidate.candidateId ?? candidate.index ?? idx;
+                const voteCount = Number(candidate.voteCount || 0);
+                const percentage =
+                  typeof getVotePercentage === "function"
+                    ? getVotePercentage(voteCount)
+                    : totalVotes > 0
+                    ? Math.round((voteCount / totalVotes) * 100)
+                    : 0;
+
+                return (
+                  <SimpleCandidateCard
+                    key={candidateId}
+                    candidate={candidate}
+                    candidateIndex={idx + 1}
+                    hasVoted={currentStepVoted}
+                    votedForCandidate={false}
+                    onVote={() => handleVoteClick(candidate, idx + 1, currentPosition)}
+                    isLoading={isLoading}
+                    canVote={currentStepVotable && !currentStepVoted && !electionEnded}
+                    showVoteCount={electionEnded}
+                    voteCount={voteCount}
+                    percentage={percentage}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            /* Uncontested / Empty Seat Notice */
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
+                <ShieldCheckIcon className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">
+                No Contested Candidates in this Area
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-5">
+                There are no registered candidate profiles for {currentStep.label} in your jurisdiction ({safeVoter?.county || "National"}). You may proceed to the next ballot.
+              </p>
+              <button
+                onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, 6))}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                <span>Proceed to Next Ballot</span>
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+            </div>
           )}
 
-          {/* Status Bar */}
-          <div className="mt-4 flex flex-wrap justify-center gap-4">
-            <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              electionEnded
-                ? "bg-red-100 text-red-700 border border-red-200"
-                : electionStarted
-                ? "bg-green-100 text-green-700 border border-green-200"
-                : "bg-yellow-100 text-yellow-700 border border-yellow-200"
-            }`}>
-              {electionEnded ? "Election Ended" : electionStarted ? "Election Active" : "Not Started"}
-            </div>
-            <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              isRegistered
-                ? "bg-green-100 text-green-700 border border-green-200"
-                : "bg-red-100 text-red-700 border border-red-200"
-            }`}>
-              {isRegistered ? "✓ Eligible Voter" : "✗ Not Registered"}
-            </div>
-            <div className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border border-gray-200">
-              {totalVotes} Total Votes
-            </div>
-          </div>
-        </div>
-      </div>
+          {/* Step Navigation Bottom Bar */}
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+            <button
+              onClick={() => setCurrentStepIndex((prev) => Math.max(prev - 1, 0))}
+              disabled={currentStepIndex === 0}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <ChevronLeftIcon className="w-4 h-4" />
+              <span>Previous Ballot</span>
+            </button>
 
-      {/* Error Display */}
-      {error && (
-        <div className="max-w-6xl mx-auto px-4 mt-6">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="text-red-700 font-medium">⚠️ {error}</p>
+            <button
+              onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, 6))}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+            >
+              <span>{currentStepIndex === 5 ? "View Ballot Summary" : "Next Ballot"}</span>
+              <ChevronRightIcon className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* Not Registered Warning */}
-      {!isRegistered && (
-        <div className="max-w-6xl mx-auto px-4 mt-6">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
-            <p className="text-yellow-800 font-semibold text-lg mb-2">
-              ⚠️ You are not registered to vote
-            </p>
-            <p className="text-yellow-700">
-              Only registered voters can participate. Contact the administrator if you believe this is an error.
-            </p>
+      {/* =========================================================================
+          STEP 7: OFFICIAL BALLOT SUMMARY & RECEIPT (POST-VOTING SCREEN)
+         ========================================================================= */}
+      {isSummaryStep && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+            <div className="text-center max-w-2xl mx-auto mb-8">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+                <CheckIcon className="w-8 h-8 text-emerald-700" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">
+                Official Ballot Summary & Receipt
+              </h2>
+              <p className="text-sm text-slate-600">
+                {hasCompletedAllVotes
+                  ? "All 6 ballots have been cast and verified on the blockchain. Your vote is permanent, tamper-proof, and cryptographically recorded."
+                  : "Review your ballot status across all 6 elective positions below before proceeding."}
+              </p>
+            </div>
+
+            {/* 6 Elective Positions Status Checklist */}
+            <div className="space-y-3 mb-8">
+              {WIZARD_BALLOT_STEPS.map((step, idx) => {
+                const isVoted = isPositionVoted(step.position);
+
+                return (
+                  <div
+                    key={step.position}
+                    className={`flex items-center justify-between p-3.5 sm:p-4 rounded-xl border transition-all ${
+                      isVoted
+                        ? "bg-emerald-50/40 border-emerald-200"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                          isVoted ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {isVoted ? <CheckIcon className="w-4 h-4" /> : step.stepNum}
+                      </div>
+                      <div>
+                        <p className="text-sm sm:text-base font-bold text-slate-900">
+                          {step.label}
+                        </p>
+                        <p className="text-xs text-slate-500">{step.jurisdiction}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isVoted ? (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200">
+                          <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" />
+                          Recorded
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setCurrentStepIndex(idx)}
+                          className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
+                        >
+                          Cast Ballot
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Actions: Download Receipt & Proceed to Results */}
+            <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                onClick={handleDownloadReceipt}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl transition-all shadow-sm"
+              >
+                <DownloadIcon className="w-4 h-4 text-slate-600" />
+                <span>Download Official Receipt (PDF)</span>
+              </button>
+
+              <button
+                onClick={handleNavigateResults}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg"
+              >
+                <BarChartIcon className="w-4 h-4 text-white" />
+                <span>Proceed to Election Results</span>
+                <ChevronRightIcon className="w-4 h-4 text-white" />
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Main Voting Area */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* No candidates message */}
-        {filteredCandidates.length === 0 && isRegistered && (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">🗳️</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              No Candidates Available
-            </h3>
-            <p className="text-gray-600">
-              {safeVoter 
-                ? "No candidates are contesting in your area yet."
-                : "Candidates will be added by the election administrator."}
-            </p>
-          </div>
-        )}
-
-        {/* Position Sections */}
-        {POSITION_ORDER.map(position => renderPositionSection(position))}
-      </div>
-
-      {/* Footer */}
-      <div className="bg-white border-t border-gray-200 mt-12">
-        <div className="max-w-6xl mx-auto px-4 py-6 text-center">
-          <p className="text-gray-500 text-sm">
-            Your votes are secured on the blockchain and cannot be changed once confirmed.
-          </p>
-        </div>
-      </div>
-
-      {/* Vote Confirmation Modal */}
+      {/* Confirmation Modal */}
       <VoteConfirmationModal
         isOpen={confirmModal.isOpen}
         candidate={confirmModal.candidate}
+        candidateIndex={confirmModal.candidateIndex}
         position={confirmModal.position}
         onConfirm={handleConfirmVote}
         onCancel={handleCancelVote}

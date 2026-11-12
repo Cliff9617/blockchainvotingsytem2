@@ -1,6 +1,7 @@
 import React from "react";
-import { getPositionDisplayName, getWinnerAreaDescription } from "../utils/electionFilters";
+import { getPositionDisplayName, getWinnerAreaDescription, formatCandidateDisplayName } from "../utils/electionFilters";
 import { getCandidateImage } from "../utils/getCandidateImage";
+import { MapPinIcon } from "./common/Icons";
 
 const CandidateCard = ({
   candidate,
@@ -19,7 +20,7 @@ const CandidateCard = ({
   const candidateId =
     candidate?.id ?? candidate?.candidateId ?? candidate?.index ?? null;
 
-  const candidateName = candidate?.name || "Unnamed Candidate";
+  const candidateName = formatCandidateDisplayName(candidate);
   const voteCount = Number(candidate?.voteCount || 0);
   const party = candidate?.party;
   const candidateCode = candidate?.candidateCode;
@@ -133,7 +134,7 @@ const CandidateCard = ({
 
   return (
     <div className={getCardClasses()}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center space-x-4">
           {candidateImage && !candidateImage.includes('placeholder') ? (
             <img
@@ -180,15 +181,16 @@ const CandidateCard = ({
               <p className="text-sm text-gray-700 mt-1 font-medium">Party: {party}</p>
             )}
             {areaDisplay && (
-              <p className="text-sm text-gray-600 mt-1">
-                📍 {areaDisplay}
+              <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                <MapPinIcon className="w-3.5 h-3.5 text-gray-400 inline" />
+                <span>{areaDisplay}</span>
               </p>
             )}
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="text-3xl font-bold text-gray-900">{voteCount}</div>
+        <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
+          <div className="text-2xl sm:text-3xl font-bold text-gray-900">{voteCount}</div>
           <div className="text-xs text-gray-600 font-medium">Votes</div>
           <div className="text-xs text-gray-500 mt-1">{percentage}%</div>
         </div>

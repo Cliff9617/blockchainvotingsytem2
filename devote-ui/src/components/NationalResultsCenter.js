@@ -495,7 +495,7 @@ const NationalResultsCenter = ({
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerTitle}>
-          🇰🇪 National Election Results Center
+          National Election Results Center
         </div>
         <div style={styles.headerSubtitle}>
           {electionConfig?.name || 'General Election 2024'}
@@ -543,7 +543,7 @@ const NationalResultsCenter = ({
             )
           ))}
           <button style={styles.refreshButton} onClick={handleRefresh}>
-            🔄 Refresh
+            Refresh
           </button>
         </div>
       </div>
@@ -558,7 +558,6 @@ const NationalResultsCenter = ({
           </div>
         ) : filteredPositions.length === 0 || candidates.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
             <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
               No Results Available
             </div>
@@ -578,7 +577,7 @@ const NationalResultsCenter = ({
       {/* Winners Summary */}
       {electionEnded && Object.keys(winners).some(k => winners[k]) && (
         <div style={styles.section}>
-          <div style={styles.sectionTitle}>🏆 Winners Summary</div>
+          <div style={styles.sectionTitle}>Winners Summary</div>
           {Object.entries(winners).map(([position, winnerData]) => {
             if (!winnerData) return null;
             
@@ -587,11 +586,11 @@ const NationalResultsCenter = ({
                 <div style={{ fontWeight: '600', marginBottom: '4px' }}>{position}</div>
                 {winnerData.isTie ? (
                   <div style={{ color: '#f59e0b' }}>
-                    ⚠️ Tie between {winnerData.tiedCandidates.map(c => c.name).join(' & ')}
+                    Tie between {winnerData.tiedCandidates.map(c => c.name).join(' & ')}
                   </div>
                 ) : winnerData.winner ? (
                   <div style={{ color: '#10b981' }}>
-                    ✅ {winnerData.winner.name} ({winnerData.winner.percentage}%)
+                    {winnerData.winner.name} ({winnerData.winner.percentage}%)
                   </div>
                 ) : null}
               </div>

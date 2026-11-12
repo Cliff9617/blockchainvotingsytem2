@@ -1,21 +1,15 @@
 import React from "react";
-import { getPositionDisplayName, getWinnerAreaDescription } from "../utils/electionFilters";
+import { getPositionDisplayName, getWinnerAreaDescription, formatCandidateDisplayName } from "../utils/electionFilters";
 import { getCandidateImage } from "../utils/getCandidateImage";
+import { CheckIcon, MapPinIcon, AwardIcon } from "./common/Icons";
 
 /**
- * SimpleCandidateCard - Redesigned for maximum simplicity and voter clarity
- * 
- * Design principles:
- * - Large, clear candidate photo/avatar
- * - Candidate name in large bold text
- * - Party and position clearly visible
- * - Area description (Kenya/County/Constituency/Ward)
- * - Large, full-width vote button
- * - Clear voted status indicators
- * - No cluttered details boxes
+ * SimpleCandidateCard - Streamlined, distraction-free candidate card
+ * Built for mobile phones and desktop with high clarity and zero visual noise.
  */
 const SimpleCandidateCard = ({
   candidate,
+  candidateIndex = null,
   hasVoted = false,
   votedForCandidate = false,
   onVote,
@@ -27,18 +21,15 @@ const SimpleCandidateCard = ({
   voteCount = 0,
   percentage = 0,
 }) => {
-  const candidateId =
-    candidate?.id ?? candidate?.candidateId ?? candidate?.index ?? null;
-
-  const candidateName = candidate?.name || "Unnamed Candidate";
+  const candidateId = candidate?.id ?? candidate?.candidateId ?? candidate?.index ?? null;
+  const candidateName = formatCandidateDisplayName(candidate, candidateIndex);
   const party = candidate?.party || "Independent";
   const position = candidate?.position;
   
-  // Get position display info
   const positionDisplay = position ? getPositionDisplayName(position) : "";
   const areaDisplay = position ? getWinnerAreaDescription(position, candidate) : "";
 
-  // Get avatar initials
+  // Initials for avatar fallback
   const getInitials = (name) => {
     if (!name) return "?";
     const parts = name.split(" ").filter(p => p.length > 0);
@@ -49,61 +40,60 @@ const SimpleCandidateCard = ({
   };
 
   const candidateImage = getCandidateImage(candidate);
-  const hasImage = candidate?.candidatePhoto || candidate?.imageData || candidate?.imageUrl;
+  const hasImage = Boolean(candidate?.candidatePhoto || candidate?.imageData || candidate?.imageUrl);
 
-  // Determine card styling based on status
+  // Card border styling
   const getCardClasses = () => {
-    let base = "bg-white rounded-2xl shadow-lg border-2 p-6 transition-all duration-300 w-full";
-    
+    const base = "bg-white rounded-2xl shadow-sm border p-4 sm:p-6 transition-all duration-200 w-full flex flex-col justify-between";
     if (votedForCandidate) {
-      return `${base} border-green-500 bg-green-50`;
+      return `${base} border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20`;
     }
     if (hasVoted && !votedForCandidate) {
-      return `${base} border-gray-200 bg-gray-50 opacity-75`;
+      return `${base} border-gray-200 bg-gray-50/60 opacity-60`;
     }
     if (isWinner) {
-      return `${base} border-yellow-400 bg-gradient-to-br from-yellow-50 to-yellow-100`;
+      return `${base} border-amber-400 bg-amber-50/30`;
     }
     if (isLeading) {
-      return `${base} border-blue-300 bg-blue-50`;
+      return `${base} border-blue-300 bg-blue-50/20`;
     }
-    return `${base} border-gray-200 hover:border-blue-300 hover:shadow-xl`;
+    return `${base} border-gray-200 hover:border-gray-300 hover:shadow-md`;
   };
 
-  // Determine button state and text
+  // Button config
   const getButtonConfig = () => {
     if (isLoading) {
       return {
-        text: "Processing...",
+        text: "Recording Vote...",
         disabled: true,
-        className: "bg-gray-400 cursor-wait"
+        className: "bg-gray-400 text-white cursor-wait"
       };
     }
     if (votedForCandidate) {
       return {
-        text: "✅ You voted for this candidate",
+        text: "Ballot Confirmed",
         disabled: true,
-        className: "bg-green-500 cursor-default"
+        className: "bg-emerald-600 text-white cursor-default"
       };
     }
     if (hasVoted && !votedForCandidate) {
       return {
-        text: `Already voted for ${positionDisplay}`,
+        text: `Ballot already cast for ${positionDisplay}`,
         disabled: true,
-        className: "bg-gray-300 cursor-not-allowed"
+        className: "bg-gray-200 text-gray-500 cursor-not-allowed"
       };
     }
     if (!canVote) {
       return {
-        text: "Voting not available",
+        text: "Voting Not Available",
         disabled: true,
-        className: "bg-gray-300 cursor-not-allowed"
+        className: "bg-gray-200 text-gray-500 cursor-not-allowed"
       };
     }
     return {
       text: `Vote for ${candidateName}`,
       disabled: false,
-      className: "bg-green-600 hover:bg-green-700 cursor-pointer"
+      className: "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white cursor-pointer shadow-sm hover:shadow"
     };
   };
 
@@ -116,101 +106,79 @@ const SimpleCandidateCard = ({
 
   return (
     <div className={getCardClasses()}>
-      {/* Winner/Leading Badge */}
-      {(isWinner || isLeading) && !hasVoted && (
-        <div className="mb-4">
+      <div>
+        {/* Status Pills */}
+        <div className="flex items-center justify-between gap-2 mb-3 min-h-[28px]">
           {isWinner && (
-            <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-bold rounded-full border border-yellow-200">
-              🏆 Winner
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-100 text-amber-900 text-xs font-semibold rounded-full border border-amber-200">
+              <AwardIcon className="w-3.5 h-3.5 text-amber-700" />
+              Certified Winner
             </span>
           )}
           {isLeading && !isWinner && (
-            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm font-bold rounded-full border border-blue-200">
-              ⭐ Leading
+            <span className="inline-flex items-center px-2.5 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full border border-blue-200">
+              Leading
+            </span>
+          )}
+          {votedForCandidate && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full border border-emerald-200 ml-auto">
+              <CheckIcon className="w-3.5 h-3.5 text-emerald-700" />
+              Your Choice
             </span>
           )}
         </div>
-      )}
 
-      {/* Main Content */}
-      <div className="flex flex-col items-center text-center">
-        {/* Candidate Photo/Avatar */}
-        <div className="mb-4">
-          {hasImage ? (
-            <img
-              src={candidateImage}
-              alt={candidateName}
-              className="w-24 h-24 rounded-full object-cover shadow-lg border-4 border-white"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-lg border-4 border-white bg-gradient-to-br from-green-500 to-green-700">
-              <span className="text-white text-3xl font-bold">
-                {getInitials(candidateName)}
-              </span>
+        {/* Candidate Profile Info */}
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-3">
+            {hasImage ? (
+              <img
+                src={candidateImage}
+                alt={candidateName}
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover shadow-sm border-2 border-white ring-2 ring-gray-100"
+              />
+            ) : (
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center shadow-sm border-2 border-white ring-2 ring-gray-100 bg-gradient-to-br from-slate-700 to-slate-900">
+                <span className="text-white text-2xl font-bold tracking-wider">
+                  {getInitials(candidateName)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 leading-snug">
+            {candidateName}
+          </h3>
+
+          <p className="text-sm sm:text-base text-gray-700 font-medium mb-1">
+            {party}
+          </p>
+
+          <p className="text-xs sm:text-sm text-gray-500 mb-2">
+            {positionDisplay}
+          </p>
+
+          {areaDisplay && (
+            <p className="inline-flex items-center gap-1 text-xs text-gray-500 mb-3 bg-gray-50 px-2.5 py-1 rounded-md">
+              <MapPinIcon className="w-3.5 h-3.5 text-gray-400" />
+              <span>{areaDisplay}</span>
+            </p>
+          )}
+
+          {showVoteCount && !hasVoted && (
+            <div className="mb-3 text-xs text-gray-500">
+              {voteCount} votes ({percentage}%)
             </div>
           )}
         </div>
+      </div>
 
-        {/* Candidate Name - Large and Bold */}
-        <h3 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
-          {candidateName}
-        </h3>
-
-        {/* Party */}
-        <p className="text-lg text-gray-700 font-semibold mb-1">
-          {party}
-        </p>
-
-        {/* Position */}
-        <p className="text-base text-gray-600 mb-1">
-          {positionDisplay}
-        </p>
-
-        {/* Area */}
-        {areaDisplay && (
-          <p className="text-sm text-gray-500 mb-4">
-            📍 {areaDisplay}
-          </p>
-        )}
-
-        {/* Vote Count (optional, kept small) */}
-        {showVoteCount && !hasVoted && (
-          <div className="mb-4 text-sm text-gray-500">
-            {voteCount} votes ({percentage}%)
-          </div>
-        )}
-
-        {/* Voted Status Indicator */}
-        {hasVoted && (
-          <div className={`mb-4 px-4 py-2 rounded-full text-sm font-semibold ${
-            votedForCandidate 
-              ? "bg-green-100 text-green-700 border border-green-200" 
-              : "bg-gray-100 text-gray-600 border border-gray-200"
-          }`}>
-            {votedForCandidate 
-              ? "✅ Your choice" 
-              : `Voted for ${positionDisplay}`}
-          </div>
-        )}
-
-        {/* Eligibility Badge (when not voted yet) */}
-        {!hasVoted && canVote && (
-          <div className="mb-4 px-4 py-2 rounded-full text-sm font-semibold bg-green-100 text-green-700 border border-green-200">
-            ✓ Eligible to vote
-          </div>
-        )}
-
-        {!hasVoted && !canVote && (
-          <div className="mb-4 px-4 py-2 rounded-full text-sm font-semibold bg-red-100 text-red-700 border border-red-200">
-            ✗ Not eligible in your area
-          </div>
-        )}
-
-        {/* Vote Button - Large and Full Width */}
+      {/* Full-width Voting Action Button */}
+      <div className="mt-4 pt-3 border-t border-gray-100">
         <button
           onClick={handleVoteClick}
           disabled={buttonConfig.disabled}
-          className={`w-full py-4 px-6 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-200 ${buttonConfig.className}`}
+          className={`w-full py-3.5 px-4 font-semibold text-sm sm:text-base rounded-xl transition-all duration-150 ${buttonConfig.className}`}
         >
           {buttonConfig.text}
         </button>

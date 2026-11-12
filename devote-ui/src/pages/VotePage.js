@@ -284,11 +284,12 @@ const VotePage = ({
         isConnected={isConnected}
         account={account}
         onNavigate={onNavigate}
+        resultsLocked={!hasVoted && !electionEnded && !isAdmin}
       />
 
       {/* ===== GATE CARD: Please Sign In to Vote ===== */}
       {shouldShowGateCard && (
-        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12">
+        <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-6 sm:py-12">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-w-md w-full text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg
@@ -325,7 +326,7 @@ const VotePage = ({
       {shouldShowLoginForm && (
         <div
           ref={loginSectionRef}
-          className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12"
+          className="min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-6 sm:py-12"
         >
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-4xl w-full overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-2">
@@ -701,6 +702,13 @@ const VotePage = ({
             totalVotes={totalVotes}
             getVotePercentage={getVotePercentage}
             isAdmin={isAdmin}
+            onProceedToResults={() => {
+              if (onNavigate) {
+                onNavigate('results');
+              } else {
+                window.location.hash = 'results';
+              }
+            }}
           />
         </div>
       )}
@@ -758,7 +766,7 @@ const VotePage = ({
 
       {/* ===== ADMIN VERIFICATION IN PROGRESS ===== */}
       {shouldShowAdminVerifying && (
-        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
+        <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl shadow-xl border border-blue-200 p-8 max-w-md w-full text-center">
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg
@@ -799,7 +807,7 @@ const VotePage = ({
 
       {/* ===== ADMIN ACCESS DENIED ===== */}
       {shouldShowAdminDenied && (
-        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
+        <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl shadow-xl border border-red-200 p-8 max-w-md w-full text-center">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg

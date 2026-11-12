@@ -386,7 +386,7 @@ const ResultsPage = ({
               {voter && (
                 <div className="mt-2 p-3 bg-white/10 rounded-lg">
                   <p className="text-dark-green-200 text-sm">
-                    📍 Viewing results for your registered area:
+                    Viewing results for your registered area:
                   </p>
                   <p className="text-white text-sm mt-1">
                     <strong>County:</strong> {voter.county || 'Not specified'} • 
@@ -432,7 +432,7 @@ const ResultsPage = ({
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-dark-green-800 bg-opacity-95 rounded-2xl shadow-xl p-6 md:p-8 -mt-8 relative z-10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {/* Total Votes Cast */}
               <div className="text-center md:text-left">
                 <p className="text-dark-green-200 text-sm font-medium uppercase tracking-wider mb-1">
@@ -488,7 +488,7 @@ const ResultsPage = ({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
               <p className="text-blue-800 font-medium">
-                📍 Viewing national results only (Presidential)
+                Viewing national results only (Presidential)
               </p>
               <p className="text-blue-700 text-sm mt-1">
                 Sign in to view county, constituency, and ward results for your registered area.
@@ -638,7 +638,7 @@ const ResultsPage = ({
                         </div>
 
                         {/* Vote count and percentage */}
-                        <div className="flex-shrink-0 text-right min-w-[100px]">
+                        <div className="flex-shrink-0 text-right sm:min-w-[100px]">
                           <div className="text-2xl md:text-3xl font-bold text-dark-green-700">
                             {votes.toLocaleString()}
                           </div>
@@ -677,7 +677,7 @@ const ResultsPage = ({
         <section className="py-8 bg-yellow-50">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-              🏆 Winners Declared
+              Official Certified Winners
             </h2>
             
             <div className="space-y-6">
@@ -691,7 +691,7 @@ const ResultsPage = ({
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-2xl font-bold">
-                        🏆 {getPositionDisplayName(position)}
+                        {getPositionDisplayName(position)}
                       </h3>
                       <span className="px-4 py-2 bg-white/20 rounded-full text-sm font-semibold">
                         {winnerInfo.votes} total votes

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import { getAllCandidateProfiles, saveCandidateProfile, validateCandidateJurisdiction } from "../services/candidateService";
-import { POSITION_INDEX, normalizePosition, getPositionIndex, normalizeText } from "../utils/electionFilters";
+import { POSITIONS, POSITION_INDEX, normalizePosition, getPositionIndex, normalizeText } from "../utils/electionFilters";
 import { recordVoteAudit } from "../services/voteAuditService";
 import { createVoteReceipt } from "../services/voteReceiptService";
 import usePermissions from "./usePermissions";
@@ -188,15 +188,25 @@ const useElection = (contract, account, isSuperAdmin) => {
       setCandidateProfiles(profiles);
 
       // Merge blockchain candidates with Firebase profiles
+      let presCounter = 1;
       const mergedCandidates = blockchainCandidates.map(blockchainCandidate => {
         const profile = profiles.find(p => p.blockchainId === blockchainCandidate.id.toString());
+        const resolvedPosition = blockchainCandidate.position || profile?.position || normalizePosition(profile?.position);
+        const isPresident = normalizePosition(resolvedPosition) === POSITIONS.PRESIDENT;
+        
+        let candidateName = profile?.name || blockchainCandidate.name;
+        if (isPresident) {
+          candidateName = `Candidate ${presCounter++}`;
+        }
+
         const merged = {
           ...blockchainCandidate,
           // Firebase profile fields override blockchain fields
           ...profile,
+          name: candidateName,
           blockchainId: blockchainCandidate.id.toString(),
           // Ensure position is set correctly
-          position: blockchainCandidate.position || profile?.position || normalizePosition(profile?.position),
+          position: resolvedPosition,
           positionIndex: blockchainCandidate.positionIndex ?? getPositionIndex(profile?.position),
         };
         console.log('[useElection] Merged candidate:', merged.id, merged.name, 'position:', merged.position);
@@ -233,9 +243,28 @@ const useElection = (contract, account, isSuperAdmin) => {
         
         console.log('[useElection] Voter info from contract:', { isRegistered, votingStatus });
 
+        const hasVotedAll = Boolean(
+          votingStatus.hasVotedPresident &&
+          votingStatus.hasVotedGovernor &&
+          votingStatus.hasVotedSenator &&
+          votingStatus.hasVotedWomanRep &&
+          votingStatus.hasVotedMP &&
+          votingStatus.hasVotedMCA
+        );
+        const hasVotedAny = Boolean(
+          votingStatus.hasVotedPresident ||
+          votingStatus.hasVotedGovernor ||
+          votingStatus.hasVotedSenator ||
+          votingStatus.hasVotedWomanRep ||
+          votingStatus.hasVotedMP ||
+          votingStatus.hasVotedMCA
+        );
+
         setVoterInfo({
           isRegistered: Boolean(isRegistered),
-          hasVoted: Boolean(isRegistered), // Simplified - voter has voted if registered and has voting status
+          hasVoted: hasVotedAll,
+          hasVotedAny,
+          hasVotedAll,
           votedFor: null, // Ballot secrecy - we don't store who they voted for
           hasVotedPresident: Boolean(votingStatus.hasVotedPresident),
           hasVotedGovernor: Boolean(votingStatus.hasVotedGovernor),
