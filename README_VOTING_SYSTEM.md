@@ -81,11 +81,9 @@ Currency Symbol: ETH
 
 ### Import Test Account
 
-To interact with the contract, import one of the test accounts from Hardhat:
+To interact with the contract, import one of the test accounts from your local Hardhat node (run `npx hardhat node` to view test accounts):
 
-**Private Key**: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5ef940bd99a9472c0e9b`
-
-**Address**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+**Test Account Address**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
 
 ## 🎯 Key Features Fixed
 
