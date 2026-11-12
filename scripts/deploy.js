@@ -2,14 +2,18 @@ const hre = require("hardhat");
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
+
   console.log("Deploying with:", deployer.address);
 
-  const Voting = await hre.ethers.getContractFactory("Voting");
-  const voting = await Voting.deploy();
+  const DeVoteNational = await hre.ethers.getContractFactory("DeVoteNational");
 
-  await voting.waitForDeployment();
+  const devote = await DeVoteNational.deploy();
 
-  console.log("Voting deployed to:", await voting.getAddress());
+  await devote.waitForDeployment();
+
+  const address = await devote.getAddress();
+
+  console.log("DeVoteNational deployed to:", address);
 }
 
 main().catch((error) => {

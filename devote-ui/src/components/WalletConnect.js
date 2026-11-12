@@ -1,4 +1,8 @@
 import React from 'react';
+import { isMetaMaskInstalled } from '../utils/connectWallet';
+
+// Mobile detection
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 const WalletConnect = ({ 
   account, 
@@ -23,8 +27,15 @@ const WalletConnect = ({
     await disconnectWallet();
   };
 
+  // Determine if we should show MetaMask installation warning
+  // On mobile, we don't show the warning as we'll redirect to MetaMask app
+  const showMetaMaskWarning = !isMobile && !isMetaMaskInstalled() && !isConnected;
+  
+  // On mobile without ethereum, clicking connect will redirect to MetaMask browser
+  const isMobileWithoutEthereum = isMobile && !window.ethereum && !isConnected;
+
   return (
-    <div className="bg-white rounded-xl shadow-soft border border-gray-100 p-6">
+    <div className="bg-white rounded-xl shadow-soft border border-gray-100 p-6 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -40,8 +51,8 @@ const WalletConnect = ({
 
         <div className="flex flex-col items-end space-y-2">
           {networkError && (
-            <div className="px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full border border-red-200">
-              Network Error
+            <div className="px-4 py-2 bg-red-50 text-red-800 text-sm rounded-lg border border-red-200 max-w-xs text-center">
+              <span className="font-medium">⚠️ {networkError}</span>
             </div>
           )}
           
@@ -58,7 +69,7 @@ const WalletConnect = ({
                 <button
                   onClick={handleDisconnect}
                   disabled={isLoading}
-                  className="px-4 py-2 bg-white text-green-700 border border-green-300 rounded-lg hover:bg-green-50 transition-colors font-medium"
+                  className="px-4 py-2 bg-white text-green-700 border border-green-300 rounded-lg hover:bg-green-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Disconnect
                 </button>
@@ -67,33 +78,71 @@ const WalletConnect = ({
           ) : (
             <button
               onClick={handleConnect}
-              disabled={isLoading}
-              className="px-8 py-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 focus-ring text-lg"
+              disabled={isLoading || (!isMobileWithoutEthereum && showMetaMaskWarning)}
+              className="px-8 py-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 text-lg shadow-md hover:shadow-lg"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-3">
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   <span>Connecting...</span>
                 </div>
               ) : (
-                '🦊 Connect MetaMask'
+                <span className="flex items-center space-x-2">
+                  <span>🦊</span>
+                  <span>Connect MetaMask</span>
+                </span>
               )}
             </button>
           )}
         </div>
       </div>
 
-      {!window.ethereum && !isConnected && (
+      {/* MetaMask not installed warning */}
+      {showMetaMaskWarning && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center space-x-3">
-            <span className="text-yellow-600">⚠️</span>
+          <div className="flex items-start space-x-3">
+            <span className="text-yellow-600 text-xl">⚠️</span>
             <div>
               <h4 className="font-medium text-yellow-800">MetaMask Not Detected</h4>
-              <p className="text-sm text-yellow-700">
-                Please install MetaMask to use this application.
+              <p className="text-sm text-yellow-700 mt-1">
+                Please install MetaMask browser extension to use this application.
               </p>
+              <a 
+                href="https://metamask.io/download/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-yellow-800 underline hover:text-yellow-900 mt-2 inline-block"
+              >
+                Download MetaMask →
+              </a>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Instructions */}
+      {!isConnected && !showMetaMaskWarning && !isMobileWithoutEthereum && (
+        <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <h4 className="font-medium text-gray-800 mb-2">How to connect:</h4>
+          <ol className="text-sm text-gray-600 space-y-1">
+            <li>1. Make sure MetaMask is installed and unlocked</li>
+            <li>2. Click "Connect MetaMask" button above</li>
+            <li>3. Approve the connection request in MetaMask</li>
+            <li>4. Switch to Sepolia Testnet if prompted</li>
+          </ol>
+        </div>
+      )}
+
+      {/* Mobile instructions */}
+      {isMobileWithoutEthereum && (
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="font-medium text-blue-800 mb-2">📱 Mobile Users:</h4>
+          <ol className="text-sm text-blue-700 space-y-1">
+            <li>1. Make sure you have MetaMask app installed</li>
+            <li>2. Click "Connect MetaMask" button below</li>
+            <li>3. You'll be redirected to MetaMask browser</li>
+            <li>4. Approve the connection and switch to Sepolia Testnet</li>
+          </ol>
         </div>
       )}
     </div>

@@ -122,6 +122,22 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
     }
   };
 
+  // ============================================================================
+  // FIX: Blockchain-first voter approval
+  // ============================================================================
+  // ROOT CAUSE: The previous implementation caught blockchain errors and
+  // continued to mark the voter as "approved" in Firestore regardless of whether
+  // the on-chain registration succeeded. This caused registeredVoters(wallet) to
+  // return false even though the UI showed the voter as approved.
+  //
+  // FIX: The blockchain is the source of truth. We:
+  //   1. Call onApproveVoter(wallet, county, constituency, ward) which invokes
+  //      contract.registerVoter() and waits for tx.wait()
+  //   2. Only if that succeeds do we write "approved" to Firestore (metadata)
+  //
+  // If the blockchain transaction fails, we do NOT mark the voter as approved.
+  // "Voter already registered" is treated as success (idempotent).
+  // ============================================================================
   const handleApprove = async (request) => {
     if (!window.confirm(`Approve registration for ${request.fullName}?`)) {
       return;
@@ -130,27 +146,44 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
     setIsProcessing(true);
     try {
       console.log('[VoterRegistrationRequests] Approving voter:', request.fullName, 'Wallet:', request.walletAddress);
-      
-      // If we have a blockchain registration function, try to register on-chain first
-      if (onApproveVoter && request.walletAddress) {
-        console.log('[VoterRegistrationRequests] Attempting blockchain registration for:', request.walletAddress);
-        try {
-          await onApproveVoter(request.walletAddress);
-          console.log('[VoterRegistrationRequests] Voter registered on blockchain');
-        } catch (blockchainError) {
-          const errorMessage = String(blockchainError.message || blockchainError);
-          // Check if the error is because voter is already registered
-          if (errorMessage.includes('Voter already registered')) {
-            console.warn('[VoterRegistrationRequests] Voter already registered on blockchain, continuing approval:', request.walletAddress);
-            // This is not a blocking error - the voter is already registered on-chain
-          } else {
-            // For other blockchain errors, log and continue with Firestore approval
-            console.error('[VoterRegistrationRequests] Blockchain registration failed:', blockchainError);
-          }
+
+      // STEP 1: Register voter on the BLOCKCHAIN FIRST (source of truth)
+      if (!onApproveVoter || !request.walletAddress) {
+        throw new Error(
+          "Cannot approve voter: blockchain registration function or wallet address is missing. " +
+          "The voter cannot be approved without on-chain registration."
+        );
+      }
+
+      console.log('[VoterRegistrationRequests] Registering voter on blockchain (source of truth):', request.walletAddress);
+
+      try {
+        // Call contract.registerVoter(address, county, constituency, ward) via the prop
+        // The prop (from useElection) waits for tx.wait() and verifies the result.
+        await onApproveVoter(
+          request.walletAddress,
+          request.county || '',
+          request.constituency || '',
+          request.ward || ''
+        );
+        console.log('[VoterRegistrationRequests] ✅ Voter registered on blockchain');
+      } catch (blockchainError) {
+        const errorMessage = String(blockchainError.message || blockchainError);
+        // "Voter already registered" is idempotent - treat as success
+        if (errorMessage.includes('Voter already registered') || errorMessage.includes('already registered')) {
+          console.warn('[VoterRegistrationRequests] Voter already registered on-chain, continuing:', request.walletAddress);
+        } else {
+          // Any other blockchain error is BLOCKING - do not mark as approved
+          console.error('[VoterRegistrationRequests] ❌ Blockchain registration failed:', blockchainError);
+          throw new Error(
+            "Blockchain registration failed: " + (blockchainError.reason || blockchainError.shortMessage || blockchainError.message) +
+            ". Voter has NOT been approved."
+          );
         }
       }
-      
-      // Create/update voter document in voters collection BEFORE updating request status
+
+      // STEP 2: ONLY after blockchain success, save metadata to Firestore
+      // Firestore is metadata storage only - the blockchain is the source of truth.
       const wallet = request.walletAddress.toLowerCase();
       const voterData = {
         fullName: request.fullName || "",
@@ -163,6 +196,7 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
         status: "approved",
         approvedAt: serverTimestamp(),
         sourceRequestId: request.id,
+        blockchainRegistered: true,
         hasVotedPresident: false,
         hasVotedGovernor: false,
         hasVotedSenator: false,
@@ -171,24 +205,23 @@ const VoterRegistrationRequests = ({ onApproveVoter }) => {
         hasVotedMCA: false
       };
 
-      console.log("Creating/updating voter document:", wallet);
+      console.log('[VoterRegistrationRequests] Blockchain success - saving metadata to Firestore:', wallet);
       console.log("Voter data:", voterData);
 
       await setDoc(doc(db, "voters", wallet), voterData, { merge: true });
-
       console.log("Voter document saved successfully");
 
       // Update Firestore approval status
       await updateRegistrationStatus(request.id, 'approved');
       console.log('[VoterRegistrationRequests] Firestore approval completed for:', request.id);
-      
+
       // Update local state
-      setRequests(prev => prev.map(r => 
+      setRequests(prev => prev.map(r =>
         r.id === request.id ? { ...r, status: 'approved', updatedAt: new Date().toISOString() } : r
       ));
     } catch (err) {
-      console.error('[VoterRegistrationRequests] Error approving request:', err);
-      alert('Failed to approve registration');
+      console.error('[VoterRegistrationRequests] ❌ Error approving request:', err);
+      alert('Failed to approve registration: ' + (err.message || 'Unknown error'));
     } finally {
       setIsProcessing(false);
     }

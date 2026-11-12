@@ -1,17 +1,8 @@
 import { ethers } from 'ethers';
+import { SEPOLIA_NETWORK } from '../config';
 
-// Sepolia Testnet Configuration
-export const SEPOLIA_NETWORK = {
-  chainId: "0xaa36a7",
-  chainName: "Sepolia Testnet",
-  rpcUrls: ["https://rpc.sepolia.org"],
-  nativeCurrency: {
-    name: "SepoliaETH",
-    symbol: "ETH",
-    decimals: 18,
-  },
-  blockExplorerUrls: ["https://sepolia.etherscan.io"],
-};
+// Re-export SEPOLIA_NETWORK from the single source of truth for backward compatibility
+export { SEPOLIA_NETWORK };
 
 export const switchToSepolia = async () => {
   if (!window.ethereum) {

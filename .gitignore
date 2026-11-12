@@ -67,3 +67,5 @@ Thumbs.db
 .netlify
 .pnp
 .pnp.js
+*.bak
+*output*.txt

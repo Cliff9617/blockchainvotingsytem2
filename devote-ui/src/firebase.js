@@ -20,4 +20,7 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore
 export const db = getFirestore(app);
 
+// Note: Candidate photographs are now stored as Base64 in Firestore documents.
+// Firebase Storage is no longer used for candidate photos.
+
 export default app;

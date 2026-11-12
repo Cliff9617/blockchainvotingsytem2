@@ -50,6 +50,24 @@ const AdminVoterVerification = () => {
   };
 
   // Approve voter
+  // ============================================================================
+  // FIX: Blockchain-first voter approval
+  // ============================================================================
+  // ROOT CAUSE: The previous implementation marked the voter as "approved" in
+  // Firestore (voters collection + voterRegistrationRequests) BEFORE calling the
+  // blockchain. If the blockchain transaction failed, the error was swallowed and
+  // the voter remained "approved" in Firestore but was NOT registered on-chain.
+  // This caused registeredVoters(wallet) to return false even though the UI showed
+  // the voter as approved.
+  //
+  // FIX: The blockchain is now the source of truth. We:
+  //   1. Call contract.registerVoter(wallet, county, constituency, ward) FIRST
+  //   2. Wait for the transaction to be mined and confirmed
+  //   3. Verify registeredVoters(wallet) === true on-chain
+  //   4. ONLY THEN do we write "approved" to Firestore (metadata only)
+  //
+  // If the blockchain transaction fails, we do NOT mark the voter as approved.
+  // ============================================================================
   const approveVoter = async (voter) => {
     const voterId = voter.id;
     setActionLoading(prev => ({ ...prev, [voterId]: true }));
@@ -70,7 +88,79 @@ const AdminVoterVerification = () => {
         return;
       }
 
-      // Step 1: Create/update voter document in voters collection FIRST
+      // Normalize the voter's wallet address
+      const normalizedAddress = ethers.getAddress(String(voter.walletAddress).trim());
+      console.log('[AdminVoterVerification] Normalized address:', normalizedAddress);
+
+      // STEP 1: Register voter on the BLOCKCHAIN FIRST (source of truth)
+      // The blockchain is the source of truth for voter registration.
+      // Firestore is metadata storage only.
+      if (!window.ethereum || !config.contractAddress) {
+        throw new Error(
+          "Cannot approve voter: blockchain wallet or contract not configured. " +
+          "Connect MetaMask and ensure the contract address is set."
+        );
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+      const contract = new ethers.Contract(config.contractAddress, config.contractABI, signer);
+
+      // DIAGNOSTIC LOGGING
+      console.log('[AdminVoterVerification] ===== BLOCKCHAIN REGISTRATION (SOURCE OF TRUTH) =====');
+      console.log('[AdminVoterVerification] Connected wallet:', signerAddress);
+      console.log('[AdminVoterVerification] Contract address:', config.contractAddress);
+      console.log('[AdminVoterVerification] Voter to register:', normalizedAddress);
+      console.log('[AdminVoterVerification] County:', voter.county || '');
+      console.log('[AdminVoterVerification] Constituency:', voter.constituency || '');
+      console.log('[AdminVoterVerification] Ward:', voter.ward || '');
+
+      // Check if voter is already registered on-chain (idempotent)
+      const isAlreadyRegistered = await contract.registeredVoters(normalizedAddress);
+      console.log('[AdminVoterVerification] Already registered on-chain:', isAlreadyRegistered);
+
+      if (!isAlreadyRegistered) {
+        console.log('[AdminVoterVerification] Registering voter on blockchain with ALL 4 params...');
+        console.log('[AdminVoterVerification] Params:', normalizedAddress, voter.county || '', voter.constituency || '', voter.ward || '');
+
+        // Call contract.registerVoter(address, county, constituency, ward)
+        const tx = await contract.registerVoter(
+          normalizedAddress,
+          voter.county || '',
+          voter.constituency || '',
+          voter.ward || ''
+        );
+        console.log('[AdminVoterVerification] Transaction sent, hash:', tx.hash);
+
+        // Wait for the transaction to be mined and confirmed
+        const receipt = await tx.wait();
+        console.log('[AdminVoterVerification] Transaction mined');
+        console.log('[AdminVoterVerification] Receipt status:', receipt.status);
+        console.log('[AdminVoterVerification] Receipt blockNumber:', receipt.blockNumber);
+
+        if (receipt.status !== 1) {
+          throw new Error("Blockchain transaction failed - voter was not registered on-chain");
+        }
+
+        console.log('[AdminVoterVerification] ✅ Voter registered on blockchain successfully:', normalizedAddress);
+      } else {
+        console.log('[AdminVoterVerification] Voter already registered on-chain, skipping tx:', normalizedAddress);
+      }
+
+      // STEP 2: Verify on-chain that registeredVoters(wallet) === true
+      const verifyRegistered = await contract.registeredVoters(normalizedAddress);
+      console.log('[AdminVoterVerification] ✅ Blockchain verification - registeredVoters():', verifyRegistered);
+
+      if (!verifyRegistered) {
+        throw new Error(
+          "Blockchain verification failed: registeredVoters(" + normalizedAddress + ") returned false " +
+          "after registration. Voter will NOT be marked as approved."
+        );
+      }
+
+      // STEP 3: ONLY after blockchain success, save metadata to Firestore
+      // Firestore is metadata storage only - the blockchain is the source of truth.
       const voterDocId = voter.walletAddress.toLowerCase();
       const voterData = {
         fullName: voter.fullName,
@@ -83,77 +173,40 @@ const AdminVoterVerification = () => {
         status: 'approved',
         approvedAt: new Date().toISOString(),
         sourceRequestId: voterId,
+        blockchainRegistered: true,
         createdAt: voter.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      console.log('[AdminVoterVerification] Creating voter document in voters collection:', voterDocId);
+      console.log('[AdminVoterVerification] Blockchain success - now saving metadata to Firestore:', voterDocId);
       console.log('[AdminVoterVerification] Voter data:', voterData);
 
       try {
         await setDoc(doc(db, 'voters', voterDocId), voterData, { merge: true });
         console.log('VOTER COPY SUCCESS:', voterDocId);
       } catch (votersError) {
-        console.error('[AdminVoterVerification] Failed to copy voter to voters collection:', votersError);
-        alert("Failed to copy voter to voters collection: " + votersError.message);
-        throw votersError; // Re-throw to prevent status update
+        console.error('[AdminVoterVerification] Failed to copy voter to voters collection (non-fatal - blockchain is source of truth):', votersError);
+        // Don't fail - the voter IS registered on-chain, Firestore is just metadata
       }
 
-      // Step 2: Update voterRegistrationRequests status to approved ONLY AFTER voters setDoc succeeds
+      // Update voterRegistrationRequests status to approved
       const voterRef = doc(db, 'voterRegistrationRequests', voterId);
       await updateDoc(voterRef, {
         status: 'approved',
         approvedAt: new Date().toISOString(),
+        blockchainRegistered: true,
         updatedAt: new Date().toISOString()
       });
 
       console.log('[AdminVoterVerification] Registration request updated to approved:', voterId);
 
-      // Step 3: Call blockchain registerVoter function if wallet is connected
-      try {
-        if (window.ethereum && voter.walletAddress && config.contractAddress) {
-          const provider = new ethers.BrowserProvider(window.ethereum);
-          const signer = await provider.getSigner();
-          
-          const contract = new ethers.Contract(config.contractAddress, config.contractABI, signer);
-          
-          // Check if voter is already registered on-chain first
-          const normalizedAddress = voter.walletAddress.toLowerCase();
-          console.log('[AdminVoterVerification] Checking blockchain registration for:', normalizedAddress);
-          
-          try {
-            // Use getVoterInfo to check registration status
-            const voterInfo = await contract.getVoterInfo(normalizedAddress);
-            const isRegistered = Array.isArray(voterInfo) ? voterInfo[0] : voterInfo?.isRegistered;
-            
-            if (isRegistered) {
-              console.log('[AdminVoterVerification] Voter already registered on-chain, skipping:', normalizedAddress);
-            } else {
-              console.log('[AdminVoterVerification] Registering voter on blockchain:', normalizedAddress);
-              const tx = await contract.registerVoter(normalizedAddress);
-              await tx.wait();
-              console.log('Voter registered on blockchain:', normalizedAddress);
-            }
-          } catch (registrationError) {
-            const errorMsg = String(registrationError.message || registrationError);
-            if (errorMsg.includes('already registered') || errorMsg.includes('Voter already registered')) {
-              console.log('[AdminVoterVerification] Voter already registered on-chain (caught in registration):', normalizedAddress);
-            } else {
-              throw registrationError;
-            }
-          }
-        }
-      } catch (blockchainError) {
-        console.warn('[AdminVoterVerification] Blockchain registration warning:', blockchainError.message);
-        // Don't fail the entire operation if blockchain call fails
-        // The voter is already approved in Firestore, which is the important part
-      }
-
-      showNotification('Voter approved successfully!', 'success');
+      showNotification('Voter approved and registered on blockchain successfully!', 'success');
       fetchPendingVoters(); // Refresh the list
     } catch (error) {
-      console.error('Error approving voter:', error);
-      showNotification('Error approving voter: ' + error.message, 'error');
+      console.error('[AdminVoterVerification] ❌ Error approving voter:', error);
+      // Do NOT mark as approved in Firestore if blockchain failed
+      const reason = error?.reason || error?.shortMessage || error?.message || 'Unknown error';
+      showNotification('Failed to approve voter (blockchain registration failed): ' + reason, 'error');
     } finally {
       setActionLoading(prev => ({ ...prev, [voterId]: false }));
     }

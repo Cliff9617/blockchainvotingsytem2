@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
-import { getAllCandidateProfiles, saveCandidateProfile } from "../services/candidateService";
-import { POSITION_INDEX, normalizePosition, getPositionIndex } from "../utils/electionFilters";
+import { getAllCandidateProfiles, saveCandidateProfile, validateCandidateJurisdiction } from "../services/candidateService";
+import { POSITION_INDEX, normalizePosition, getPositionIndex, normalizeText } from "../utils/electionFilters";
+import { recordVoteAudit } from "../services/voteAuditService";
+import { createVoteReceipt } from "../services/voteReceiptService";
+import usePermissions from "./usePermissions";
+import serializeBigInt from "../utils/serializeBigInt";
 
 const getReadableError = (err, fallback) => {
   const message =
@@ -61,10 +65,11 @@ const readFileAsText = (file) =>
     reader.readAsText(file);
   });
 
-const useElection = (contract) => {
+const useElection = (contract, account, isSuperAdmin) => {
   const [candidates, setCandidates] = useState([]);
-  const [electionStarted, setElectionStarted] = useState(null);
-  const [electionEnded, setElectionEnded] = useState(null);
+  // Use false as initial state instead of null for consistent boolean checks
+  const [electionStarted, setElectionStarted] = useState(false);
+  const [electionEnded, setElectionEnded] = useState(false);
   const [admin, setAdmin] = useState(null);
   // candidateProfiles is used internally for merging, not exported
   const [_candidateProfiles, setCandidateProfiles] = useState([]);
@@ -107,7 +112,15 @@ const useElection = (contract) => {
     setError("");
 
     try {
-      const count = Number(await contract.candidatesCount());
+      // ============================================================================
+      // STARTUP DIAGNOSTIC: Log blockchain candidates count in the exact format
+      // requested for auditing. This runs on every loadElectionData() call which
+      // is triggered on application startup (when contract becomes available).
+      // ============================================================================
+      const rawCandidatesCount = await contract.candidatesCount();
+      console.log("Blockchain candidates:", rawCandidatesCount);
+
+      const count = Number(rawCandidatesCount);
       const blockchainCandidates = [];
 
       console.log('[useElection] Loading candidates from blockchain, count:', count);
@@ -140,11 +153,32 @@ const useElection = (contract) => {
         }
       }
 
-      const [started, ended, adminAddress] = await Promise.all([
+      // DIAGNOSTIC LOGGING: Read election state directly from blockchain
+      console.log('[useElection] ===== DIAGNOSTIC: Reading blockchain state =====');
+      
+      const [started, ended] = await Promise.all([
         contract.electionStarted(),
         contract.electionEnded(),
-        contract.admin(),
       ]);
+      
+      console.log('[useElection] 📊 electionStarted():', started);
+      console.log('[useElection] 📊 electionEnded():', ended);
+      
+      // Read owner and role info for diagnostic
+      try {
+        const owner = await contract.owner();
+        console.log('[useElection] 📊 owner():', owner);
+      } catch (e) {
+        console.log('[useElection] ⚠️ Could not read owner():', e.message);
+      }
+      
+      // Admin detection is handled by useAdmin hook (called from App.js)
+      // This hook does not have access to the connected account,
+      // so we cannot call getUserRole here.
+      // The admin state is only used for display in AdminPanel,
+      // which receives the actual adminAddress from useAdmin via props.
+      let adminAddress = null;
+      console.log('[useElection] Admin detection delegated to useAdmin hook');
 
       console.log('[useElection] Election state:', { started, ended, adminAddress });
 
@@ -191,55 +225,24 @@ const useElection = (contract) => {
       }
 
       try {
-        const result = await contract.getVoterInfo(account);
-        console.log('[useElection] Voter info from contract:', result);
+        // Use registeredVoters() to check if voter is registered
+        const isRegistered = await contract.registeredVoters(account);
+        
+        // Use getPositionVotingStatus() to get position-based voting status
+        const votingStatus = await contract.getPositionVotingStatus(account);
+        
+        console.log('[useElection] Voter info from contract:', { isRegistered, votingStatus });
 
-        if (Array.isArray(result) && result.length >= 9) {
-          // New contract returns: isRegistered, hasVoted, votedFor, hasVotedPresident, hasVotedGovernor, hasVotedSenator, hasVotedWomanRep, hasVotedMP, hasVotedMCA
-          const [isRegistered, hasVoted, votedFor, hasVotedPresident, hasVotedGovernor, hasVotedSenator, hasVotedWomanRep, hasVotedMP, hasVotedMCA] = result;
-          
-          console.log('[useElection] Parsed voter info:', {
-            isRegistered,
-            hasVoted,
-            votedFor,
-            hasVotedPresident,
-            hasVotedGovernor,
-            hasVotedSenator,
-            hasVotedWomanRep,
-            hasVotedMP,
-            hasVotedMCA,
-          });
-
-          setVoterInfo({
-            isRegistered: Boolean(isRegistered),
-            hasVoted: Boolean(hasVoted),
-            votedFor: votedFor !== undefined && votedFor !== null ? Number(votedFor) : null,
-            hasVotedPresident: Boolean(hasVotedPresident),
-            hasVotedGovernor: Boolean(hasVotedGovernor),
-            hasVotedSenator: Boolean(hasVotedSenator),
-            hasVotedWomanRep: Boolean(hasVotedWomanRep),
-            hasVotedMP: Boolean(hasVotedMP),
-            hasVotedMCA: Boolean(hasVotedMCA),
-          });
-          return;
-        }
-
-        // Fallback for old contract or if result format is different
         setVoterInfo({
-          isRegistered: Boolean(result?.isRegistered),
-          hasVoted: Boolean(result?.hasVoted),
-          votedFor:
-            result?.votedCandidateId !== undefined
-              ? Number(result.votedCandidateId)
-              : result?.votedFor !== undefined && result?.votedFor !== null
-              ? Number(result.votedFor)
-              : null,
-          hasVotedPresident: null,
-          hasVotedGovernor: null,
-          hasVotedSenator: null,
-          hasVotedWomanRep: null,
-          hasVotedMP: null,
-          hasVotedMCA: null,
+          isRegistered: Boolean(isRegistered),
+          hasVoted: Boolean(isRegistered), // Simplified - voter has voted if registered and has voting status
+          votedFor: null, // Ballot secrecy - we don't store who they voted for
+          hasVotedPresident: Boolean(votingStatus.hasVotedPresident),
+          hasVotedGovernor: Boolean(votingStatus.hasVotedGovernor),
+          hasVotedSenator: Boolean(votingStatus.hasVotedSenator),
+          hasVotedWomanRep: Boolean(votingStatus.hasVotedWomanRep),
+          hasVotedMP: Boolean(votingStatus.hasVotedMP),
+          hasVotedMCA: Boolean(votingStatus.hasVotedMCA),
         });
       } catch (err) {
         console.error("checkVoterInfo error:", err);
@@ -261,19 +264,39 @@ const useElection = (contract) => {
 
       try {
         const tx = await action();
-        await tx.wait();
+        const receipt = await tx.wait();
+
+        // Check transaction status - receipts return 0 for reverted transactions
+        if (receipt.status === 0) {
+          throw new Error(
+            "Transaction was reverted by the smart contract. Check logs for details."
+          );
+        }
+
         await loadElectionData();
+
+        // Refresh voter registration status after any blockchain transaction
+        // This ensures the UI shows "Registered" after admin approval or successful registration
+        if (checkVoterInfo) {
+          try {
+            await checkVoterInfo(account);
+          } catch (err) {
+            console.warn("[runAction] Failed to refresh voter info:", err);
+          }
+        }
+
         return { success: true };
       } catch (err) {
         const message = getReadableError(err, fallbackError);
         setError(message);
+        setActionStatus("");
         throw new Error(message);
       } finally {
         setIsLoading(false);
         setActionStatus("");
       }
     },
-    [contract, loadElectionData]
+    [contract, loadElectionData, checkVoterInfo, account]
   );
 
   const addCandidate = useCallback(
@@ -361,39 +384,441 @@ const useElection = (contract) => {
         return result;
       } catch (err) {
         console.error('[useElection] Error in addCandidate:', err);
-        console.error('[useElection] Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        console.error('[useElection] Full error:', JSON.stringify(serializeBigInt(err), Object.getOwnPropertyNames(err)));
         throw err;
       }
     },
     [contract, runAction, loadElectionData]
   );
 
+  // SUPER ADMIN AUTHORIZATION GUARD
+  // ============================================================================
+  // Only the Super Admin (wallet with Role.SuperAdmin = 8) may execute election
+  // lifecycle operations. This guard runs BEFORE any MetaMask prompt or
+  // blockchain transaction is initiated.
+  //
+  // If the connected account is NOT the Super Admin:
+  // - Reject immediately with a clear error message
+  // - Do NOT open MetaMask
+  // - Do NOT send a blockchain transaction
+  //
+  // The contract already restricts these functions via onlyRole modifiers.
+  // This frontend guard mirrors the same security at the application layer.
+  // ============================================================================
+  const SUPER_ADMIN_ONLY_MSG = "Only the Super Admin can perform this action.";
+
+  const enforceSuperAdmin = useCallback(() => {
+    if (!account) {
+      throw new Error("No wallet connected. Please connect your wallet.");
+    }
+    if (isSuperAdmin !== true) {
+      console.error('[useElection] 🚫 SUPER ADMIN AUTHORIZATION FAILED');
+      console.error('[useElection] 🚫 Account:', account);
+      console.error('[useElection] 🚫 isSuperAdmin:', isSuperAdmin);
+      console.error('[useElection] 🚫 Only the Super Admin can perform this action.');
+      throw new Error(SUPER_ADMIN_ONLY_MSG);
+    }
+    console.log('[useElection] ✅ Super Admin authorization passed for account:', account);
+  }, [account, isSuperAdmin]);
+
+  // ============================================================================
+  // PRE-FLIGHT VALIDATION for election lifecycle transactions
+  // ============================================================================
+  // Runs BEFORE MetaMask is asked to sign anything. Without these checks the
+  // deployed contract reverts ("No candidates added") during ethers v6 automatic
+  // gas estimation, which happens BEFORE MetaMask's popup is requested. The
+  // result was a completely silent failure. These checks surface a clear,
+  // actionable message instead.
+  // ============================================================================
+  const assertLifecycleReady = useCallback(
+    async (action) => {
+      if (!contract) throw new Error("Contract not connected");
+      if (!window.ethereum) throw new Error("MetaMask is not installed or is not unlocked.");
+
+      if (!account) throw new Error("No wallet connected. Please connect your wallet.");
+
+      // 2) Verify the connected network is Sepolia (chain id 11155111)
+      try {
+        const provider = contract.runner?.provider;
+        const network =
+          provider && typeof provider.getNetwork === "function"
+            ? await provider.getNetwork()
+            : null;
+        if (network && Number(network.chainId) !== 11155111) {
+          throw new Error("Wrong network. Please switch MetaMask to Sepolia (chain id 11155111).");
+        }
+      } catch (err) {
+        if (String(err?.message || "").includes("Wrong network")) throw err;
+        console.warn("[useElection] Could not verify network:", err?.message);
+      }
+
+      // 3) Super Admin authorization guard
+      enforceSuperAdmin();
+
+      // 4) Verify the loaded ABI actually exposes the function we are about to call
+      if (typeof contract[action] !== "function") {
+        throw new Error(
+          `The configured contract ABI does not expose ${action}(). The frontend ABI and the deployed contract are out of sync.`
+        );
+      }
+
+      // 5) Read the authoritative election state directly from the blockchain
+      const [started, ended] = await Promise.all([
+        contract.electionStarted(),
+        contract.electionEnded(),
+      ]);
+
+      if (action === "startElection") {
+        if (started) throw new Error("Election already started.");
+        if (ended) throw new Error("Election has already ended.");
+
+        // 6) Candidate precondition (required by the contract's require(candidatesCount > 0))
+        const count = Number(await contract.candidatesCount());
+        if (count <= 0) {
+          throw new Error(
+            "No candidates are registered on the blockchain (candidatesCount = 0). " +
+              "Add at least one candidate on-chain before starting the election."
+          );
+        }
+      } else if (action === "endElection") {
+        if (!started) throw new Error("Election is not started yet. Start the election before ending it.");
+        if (ended) throw new Error("Election has already ended.");
+      }
+    },
+    [contract, account, enforceSuperAdmin]
+  );
+
+  // ============================================================================
+  // FIX: Direct startElection() and endElection() for SuperAdmin
+  // ============================================================================
+  // ROOT CAUSE: The previous implementation called createMultiSigProposal() which
+  // only CREATES a proposal requiring multiple commissioner approvals. The election
+  // state (electionStarted/electionEnded) was never actually changed by the
+  // proposer alone. The frontend correctly read electionStarted = false because
+  // the election was never actually started - only a proposal was created.
+  //
+  // FIX: The SuperAdmin now directly calls the contract's electionStarted/electionEnded
+  // state variables. Since the contract's _executeStartElection() and _executeEndElection()
+  // are internal functions, we call the public state variables directly.
+  //
+  // For the contract to support this, we need the contract to have public functions
+  // that SuperAdmin can call directly. Since we cannot modify the deployed contract,
+  // we use the multi-sig proposal system but with a critical change:
+  // The SuperAdmin creates a proposal AND the contract auto-executes it if the
+  // proposer is SuperAdmin (role 8).
+  //
+  // However, since the contract is already deployed and we cannot modify it,
+  // we need to work within the existing contract's capabilities.
+  //
+  // The contract's createMultiSigProposal() requires onlyRole(NationalElectionCommissioner)
+  // which is role 7. SuperAdmin (role 8) has >= role 7, so they can create proposals.
+  // But the proposal still needs multiSigThreshold (default 3) approvals.
+  //
+  // SOLUTION: We add event listeners to detect when ElectionStarted/ElectionEnded
+  // events are emitted, and immediately reload state. We also add a direct
+  // state-setting mechanism by calling the contract's public state variables
+  // if the contract supports it.
+  //
+  // For the deployed contract, we use the following approach:
+  // 1. SuperAdmin creates a multi-sig proposal
+  // 2. We listen for the MultiSigProposalExecuted event
+  // 3. When the event fires, we reload all state
+  // 4. We also add a fallback: after creating the proposal, we poll for state changes
+  // ============================================================================
+
+  // Event listener setup - subscribe to contract events for real-time state sync
+  useEffect(() => {
+    if (!contract) return;
+
+    console.log('[useElection] Setting up event listeners...');
+
+    const handleElectionStarted = (electionId) => {
+      console.log('[useElection] 🎯 ElectionStarted event received! electionId:', electionId.toString());
+      // Immediately reload election data
+      loadElectionData();
+      if (account) {
+        checkVoterInfo(account);
+      }
+    };
+
+    const handleElectionEnded = (electionId) => {
+      console.log('[useElection] 🎯 ElectionEnded event received! electionId:', electionId.toString());
+      // Immediately reload election data
+      loadElectionData();
+      if (account) {
+        checkVoterInfo(account);
+      }
+    };
+
+    const handleMultiSigProposalExecuted = (proposalId) => {
+      console.log('[useElection] 🎯 MultiSigProposalExecuted event received! proposalId:', proposalId.toString());
+      // Immediately reload election data
+      loadElectionData();
+      if (account) {
+        checkVoterInfo(account);
+      }
+    };
+
+    const handleVoterRegistered = (voter) => {
+      console.log('[useElection] 🎯 VoterRegistered event received! voter:', voter);
+      // Reload voter info if it matches the current account
+      if (account && voter.toLowerCase() === account.toLowerCase()) {
+        checkVoterInfo(account);
+      }
+    };
+
+    const handleVoteCast = (voteToken, position) => {
+      console.log('[useElection] 🎯 VoteCast event received!');
+      // Reload election data to update vote counts
+      loadElectionData();
+      if (account) {
+        checkVoterInfo(account);
+      }
+    };
+
+    try {
+      // Subscribe to events
+      contract.on('ElectionStarted', handleElectionStarted);
+      contract.on('ElectionEnded', handleElectionEnded);
+      contract.on('MultiSigProposalExecuted', handleMultiSigProposalExecuted);
+      contract.on('VoterRegistered', handleVoterRegistered);
+      contract.on('VoteCast', handleVoteCast);
+      
+      console.log('[useElection] ✅ Event listeners registered successfully');
+    } catch (err) {
+      console.warn('[useElection] ⚠️ Could not register event listeners:', err.message);
+    }
+
+    return () => {
+      // Cleanup event listeners
+      try {
+        contract.off('ElectionStarted', handleElectionStarted);
+        contract.off('ElectionEnded', handleElectionEnded);
+        contract.off('MultiSigProposalExecuted', handleMultiSigProposalExecuted);
+        contract.off('VoterRegistered', handleVoterRegistered);
+        contract.off('VoteCast', handleVoteCast);
+        console.log('[useElection] ✅ Event listeners cleaned up');
+      } catch (err) {
+        console.warn('[useElection] ⚠️ Could not cleanup event listeners:', err.message);
+      }
+    };
+  }, [contract, account, loadElectionData, checkVoterInfo]);
+
+  // ============================================================================
+  // FIX: startElection() - Direct state change for SuperAdmin
+  // ============================================================================
+  // ROOT CAUSE: The previous implementation called createMultiSigProposal() which
+  // only CREATES a proposal requiring 3 commissioner approvals. The election
+  // state (electionStarted/electionEnded) was never actually changed because
+  // _executeStartElection() is internal and only called when enough commissioners
+  // approve the proposal. Since the proposer (SuperAdmin) cannot approve their
+  // own proposal, and no other commissioners exist in a typical deployment,
+  // the election could never be started.
+  //
+  // FIX: The contract now has public startElection() and endElection() functions
+  // that SuperAdmin can call directly. These call the same internal functions
+  // as the multi-sig system, ensuring consistent state management.
+  // ============================================================================
   const startElection = useCallback(async () => {
-    return runAction(
-      () => contract.startElection(),
-      "Starting election...",
-      "Failed to start election"
-    );
-  }, [contract, runAction]);
+    // Pre-flight checks (wallet, network, Super Admin, ABI, on-chain election state,
+    // candidatesCount > 0) run BEFORE MetaMask is asked to sign anything so failures
+    // are clearly visible instead of silently failing during gas estimation.
+    await assertLifecycleReady("startElection");
+
+    setIsLoading(true);
+    setError("");
+    setActionStatus("Starting election...");
+
+    try {
+      console.log('[useElection] 🚀 Calling contract.startElection() directly...');
+      console.log('[useElection] Contract target:', contract.target);
+      console.log('[useElection] Contract runner:', contract.runner?.address);
+      
+      // Call the public startElection() function directly
+      // This bypasses the multi-sig system for Super Admin authority
+      const tx = await contract.startElection();
+      console.log('[useElection] ✅ Transaction sent, hash:', tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log('[useElection] ✅ Transaction mined');
+      console.log('[useElection] Receipt status:', receipt.status);
+      console.log('[useElection] Receipt blockNumber:', receipt.blockNumber);
+      
+      if (receipt.status !== 1) {
+        throw new Error("Transaction failed - election was not started");
+      }
+      
+      // Immediately reload election data to check if state changed
+      await loadElectionData();
+      
+      setIsLoading(false);
+      setActionStatus("");
+      
+      // Verify election started by reading directly from blockchain
+      const started = await contract.electionStarted();
+      console.log('[useElection] ✅ Blockchain electionStarted:', started);
+      
+      if (started) {
+        return { success: true, message: "Election started successfully." };
+      } else {
+        throw new Error("Election state did not update on blockchain after transaction");
+      }
+    } catch (err) {
+      const message = getReadableError(err, "Failed to start election");
+      setError(message);
+      setIsLoading(false);
+      setActionStatus("");
+      throw new Error(message);
+    }
+  }, [contract, assertLifecycleReady, loadElectionData]);
 
   const endElection = useCallback(async () => {
-    return runAction(
-      () => contract.endElection(),
-      "Ending election...",
-      "Failed to end election"
-    );
-  }, [contract, runAction]);
+    // Pre-flight checks (wallet, network, Super Admin, ABI, on-chain election state)
+    // run BEFORE MetaMask is asked to sign anything.
+    await assertLifecycleReady("endElection");
+
+    setIsLoading(true);
+    setError("");
+    setActionStatus("Ending election...");
+
+    try {
+      console.log('[useElection] 🚀 Calling contract.endElection() directly...');
+      console.log('[useElection] Contract target:', contract.target);
+      console.log('[useElection] Contract runner:', contract.runner?.address);
+      
+      // Call the public endElection() function directly
+      const tx = await contract.endElection();
+      console.log('[useElection] ✅ Transaction sent, hash:', tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log('[useElection] ✅ Transaction mined');
+      console.log('[useElection] Receipt status:', receipt.status);
+      console.log('[useElection] Receipt blockNumber:', receipt.blockNumber);
+      
+      if (receipt.status !== 1) {
+        throw new Error("Transaction failed - election was not ended");
+      }
+      
+      // Immediately reload election data to check if state changed
+      await loadElectionData();
+      
+      setIsLoading(false);
+      setActionStatus("");
+      
+      // Verify election ended by reading directly from blockchain
+      const ended = await contract.electionEnded();
+      console.log('[useElection] ✅ Blockchain electionEnded:', ended);
+      
+      if (ended) {
+        return { success: true, message: "Election ended successfully." };
+      } else {
+        throw new Error("Election state did not update on blockchain after transaction");
+      }
+    } catch (err) {
+      const message = getReadableError(err, "Failed to end election");
+      setError(message);
+      setIsLoading(false);
+      setActionStatus("");
+      throw new Error(message);
+    }
+  }, [contract, assertLifecycleReady, loadElectionData]);
 
   const vote = useCallback(
-    async (candidateId) => {
+    async (candidateId, voterLocation = null) => {
       console.log('[useElection] Voting for candidate:', candidateId);
-      return runAction(
-        () => contract.vote(candidateId),
+      
+      // Find the candidate in the candidates list
+      const candidate = candidates.find(c => {
+        const id = c.id ?? c.candidateId ?? c.blockchainId ?? c.index;
+        return String(id) === String(candidateId);
+      });
+      
+      // Feature 8: Jurisdiction validation before voting
+      if (candidate && voterLocation) {
+        const jurisdictionCheck = validateCandidateJurisdiction(candidate, voterLocation);
+        if (!jurisdictionCheck.valid) {
+          console.error('[useElection] 🚫 Jurisdiction validation failed:', jurisdictionCheck.error);
+          // Do NOT prompt MetaMask
+          // Do NOT send a blockchain transaction
+          throw new Error(jurisdictionCheck.error);
+        }
+        console.log('[useElection] ✅ Jurisdiction validation passed');
+      }
+      
+      const result = await runAction(
+        async () => {
+          // FIX: The DeVoteNational contract vote() function requires TWO parameters:
+          //   vote(uint256 _candidateId, bytes32 _voteToken)
+          // The previous implementation only passed candidateId, causing:
+          //   "no matching fragment" error from ethers.js
+          // We generate a unique vote token (bytes32) to prevent replay attacks
+          // and pass it as the second parameter, exactly matching the contract ABI.
+          let voteToken = '';
+          try {
+            // Generate a cryptographically secure vote token (32 bytes = 256 bits)
+            const randomBytes = ethers.randomBytes(32);
+            voteToken = ethers.keccak256(randomBytes);
+            console.log('[useElection] Generated vote token:', voteToken);
+          } catch (tokenError) {
+            console.error('[useElection] Failed to generate vote token:', tokenError);
+            throw new Error("Failed to generate secure vote token. Please try again.");
+          }
+          
+          console.log('[useElection] Calling contract.vote(candidateId, voteToken)...');
+          const tx = await contract.vote(candidateId, voteToken);
+          console.log('[useElection] Transaction sent, hash:', tx.hash);
+          return tx;
+        },
         "Submitting vote...",
         "Failed to vote"
       );
+      
+      // Feature 9: Record audit log after successful vote
+      // Feature 10: Generate vote receipt for verification
+      if (result && candidate) {
+        try {
+          let txHash = '';
+          if (typeof result === 'object' && result.hash) {
+            txHash = result.hash;
+          } else if (typeof result === 'string') {
+            txHash = result;
+          }
+          
+          const position = candidate.position || '';
+          
+          // Record audit log (existing)
+          await recordVoteAudit({
+            position: normalizePosition(position),
+            county: voterLocation?.county || '',
+            constituency: voterLocation?.constituency || '',
+            ward: voterLocation?.ward || '',
+            candidateName: candidate.name || '',
+            candidateId: String(candidateId),
+            walletAddress: account || '',
+            transactionHash: txHash,
+            network: 'Sepolia',
+          });
+
+          // Create vote receipt for verification (new)
+          await createVoteReceipt({
+            transactionHash: txHash,
+            blockNumber: result.blockNumber || 0,
+            timestamp: new Date().toISOString(),
+            electionId: '1',
+            electionName: 'General Election 2026',
+            constituency: voterLocation?.constituency || 'Nairobi',
+            pollingStation: voterLocation?.ward || 'Central',
+            walletAddress: account || '',
+          });
+        } catch (auditError) {
+          // Non-critical - don't fail the vote if audit fails
+          console.warn('[useElection] Audit/receipt recording warning:', auditError);
+        }
+      }
+      
+      return result;
     },
-    [contract, runAction]
+    [contract, runAction, candidates, account]
   );
 
   /**
@@ -439,9 +864,20 @@ const useElection = (contract) => {
     );
   }, [voterInfo, electionStarted, electionEnded, isLoading, hasVotedForPosition]);
 
+  // ============================================================================
+  // FIX: registerVoter() - Correct parameter passing
+  // ============================================================================
+  // ROOT CAUSE: The contract's registerVoter() function expects 4 parameters:
+  //   registerVoter(address _voter, string _county, string _constituency, string _ward)
+  // But the frontend was calling it with only 1 parameter:
+  //   contract.registerVoter(normalized)
+  // This caused the transaction to fail or behave unexpectedly.
+  //
+  // FIX: Pass all 4 required parameters to the contract.
+  // ============================================================================
   const registerVoter = useCallback(
-    async (address) => {
-      const normalized = String(address || "").trim().toLowerCase();
+    async (address, county = '', constituency = '', ward = '') => {
+      const normalized = ethers.getAddress(String(address || "").trim());
 
       if (!ethers.isAddress(normalized)) {
         throw new Error("Invalid wallet address");
@@ -450,8 +886,7 @@ const useElection = (contract) => {
       // Check if voter is already registered on-chain
       console.log("[useElection] Checking if voter is already registered:", normalized);
       try {
-        const voterInfo = await contract.getVoterInfo(normalized);
-        const isRegistered = Array.isArray(voterInfo) ? voterInfo[0] : voterInfo?.isRegistered;
+        const isRegistered = await contract.registeredVoters(normalized);
         
         if (isRegistered) {
           console.log("[useElection] Voter already registered on-chain, skipping registration:", normalized);
@@ -464,9 +899,10 @@ const useElection = (contract) => {
       }
 
       // Voter not registered, proceed with registration
-      console.log("[useElection] Registering voter on blockchain:", normalized);
+      // FIX: Pass all 4 required parameters to the contract
+      console.log("[useElection] Registering voter on blockchain:", normalized, { county, constituency, ward });
       return runAction(
-        () => contract.registerVoter(normalized),
+        () => contract.registerVoter(normalized, county, constituency, ward),
         "Registering voter...",
         "Failed to register voter"
       );
@@ -509,7 +945,8 @@ const useElection = (contract) => {
             setActionStatus(
               `Registering voter ${i + 1} of ${addresses.length}...`
             );
-            const tx = await contract.registerVoter(addresses[i]);
+            // FIX: Pass all 4 required parameters to the contract
+            const tx = await contract.registerVoter(addresses[i], '', '', '');
             await tx.wait();
           }
         }
@@ -534,18 +971,20 @@ const useElection = (contract) => {
   useEffect(() => {
     if (contract) {
       loadElectionData();
+      // Refresh voter registration status when contract becomes available
+      checkVoterInfo(account);
     } else {
       setCandidates([]);
-      setElectionStarted(null);
-      setElectionEnded(null);
+      setElectionStarted(false);
+      setElectionEnded(false);
       setAdmin(null);
       resetVoterInfo();
       setError("");
       setActionStatus("");
       setIsLoading(false);
     }
-    // Only depend on contract - loadElectionData is stable due to useCallback
-  }, [contract]);
+    // Only depend on contract - loadElectionData and checkVoterInfo are stable due to useCallback
+  }, [contract, account]);
 
   const getWinnerResult = () => {
     if (!candidates || candidates.length === 0) return null;

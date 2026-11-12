@@ -10,6 +10,7 @@ import {
   verifyNationalId,
   normalizeFullName,
 } from '../utils/security';
+import { safeStringify } from '../utils/serializeBigInt';
 
 const REGISTRATION_COLLECTION = 'voterRegistrationRequests';
 const LOCAL_STORAGE_KEY = 'voterRegistrationRequests';
@@ -42,7 +43,7 @@ export const submitRegistration = async (registrationData) => {
       createdAt: new Date().toISOString(),
     };
     storedRequests.push(newRequest);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(storedRequests));
+    localStorage.setItem(LOCAL_STORAGE_KEY, safeStringify(storedRequests));
     console.log('[RegistrationService] Registration saved to localStorage');
     return newRequest;
   }
@@ -135,7 +136,7 @@ export const updateRegistrationStatus = async (requestId, status, rejectionReaso
         ...updateData,
         updatedAt: new Date().toISOString(),
       };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(storedRequests));
+      localStorage.setItem(LOCAL_STORAGE_KEY, safeStringify(storedRequests));
       console.log('[RegistrationService] Registration status updated in localStorage:', status);
     }
   }

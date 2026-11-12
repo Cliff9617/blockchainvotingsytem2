@@ -1,228 +1,573 @@
 /**
- * Security Utilities for DeVote
- * Handles hashing and verification of sensitive data (PIN, National ID)
+ * DeVote National - Security Utilities
+ * Professional National-Grade Election Management Platform
  * 
- * Security Rules:
- * - PIN must be 4-6 digits only
- * - Full name should be trimmed and converted to uppercase
- * - National ID should be stored as a hash, not raw text
- * - For display in admin dashboard, show masked ID only (e.g., ******78)
+ * This module provides security utilities including:
+ * - Input sanitization
+ * - XSS prevention
+ * - Rate limiting
+ * - Session management
+ * - Wallet validation
+ * - Replay attack protection
  */
 
-import bcrypt from 'bcryptjs';
+import { SECURITY, VALIDATION } from '../config';
 
-// Bcrypt salt rounds - higher = more secure but slower
-const SALT_ROUNDS = 10;
+// ==========================================
+// INPUT SANITIZATION
+// ==========================================
 
 /**
- * Validate that a PIN is 4-6 digits only
- * @param {string|number} pin - The PIN to validate
+ * Sanitize string input to prevent XSS and injection attacks
+ * @param {string} input - Raw input string
+ * @returns {string} - Sanitized string
+ */
+export const sanitizeInput = (input) => {
+  if (typeof input !== 'string') return '';
+  
+  // Remove HTML tags
+  let sanitized = input.replace(/<[^>]*>/g, '');
+  
+  // Remove script tags and javascript: protocol
+  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  sanitized = sanitized.replace(/javascript:/gi, '');
+  
+  // Remove event handlers
+  sanitized = sanitized.replace(/on\w+\s*=/gi, '');
+  
+  // Remove special characters that could be used for injection
+  sanitized = sanitized.replace(/[<>\"'&]/g, (char) => {
+    const entities = {
+      '<': '<',
+      '>': '>',
+      '"': '"',
+      "'": '&#x27;',
+      '&': '&',
+    };
+    return entities[char] || char;
+  });
+  
+  // Trim whitespace
+  sanitized = sanitized.trim();
+  
+  return sanitized;
+};
+
+/**
+ * Sanitize object with multiple fields
+ * @param {Object} obj - Object with string fields to sanitize
+ * @param {string[]} fields - Array of field names to sanitize
+ * @returns {Object} - Object with sanitized fields
+ */
+export const sanitizeObject = (obj, fields) => {
+  if (!obj || typeof obj !== 'object') return {};
+  
+  const sanitized = { ...obj };
+  
+  fields.forEach(field => {
+    if (typeof sanitized[field] === 'string') {
+      sanitized[field] = sanitizeInput(sanitized[field]);
+    }
+  });
+  
+  return sanitized;
+};
+
+// ==========================================
+// WALLET VALIDATION
+// ==========================================
+
+/**
+ * Validate Ethereum wallet address
+ * @param {string} address - Wallet address to validate
  * @returns {boolean} - True if valid
  */
-export const validatePin = (pin) => {
-  if (pin === null || pin === undefined) return false;
-  const pinStr = String(pin).trim();
-  return /^\d{4,6}$/.test(pinStr);
+export const isValidWalletAddress = (address) => {
+  if (!address || typeof address !== 'string') return false;
+  
+  // Check basic format (0x followed by 40 hex characters)
+  const regex = /^0x[a-fA-F0-9]{40}$/;
+  return regex.test(address);
 };
 
 /**
- * Hash a PIN using bcrypt
- * @param {string|number} pin - The PIN to hash
- * @returns {Promise<string>} - The hashed PIN
+ * Normalize wallet address to lowercase
+ * @param {string} address - Wallet address
+ * @returns {string|null} - Normalized address or null if invalid
  */
-export const hashPin = async (pin) => {
-  if (!validatePin(pin)) {
-    throw new Error('Invalid PIN: must be 4-6 digits');
+export const normalizeWalletAddress = (address) => {
+  if (!isValidWalletAddress(address)) return null;
+  return address.toLowerCase();
+};
+
+// ==========================================
+// RATE LIMITING
+// ==========================================
+
+const rateLimitStore = new Map();
+
+/**
+ * Check if action is rate limited
+ * @param {string} key - Unique identifier for the action
+ * @param {number} maxRequests - Maximum requests allowed in window
+ * @param {number} windowMs - Time window in milliseconds
+ * @returns {boolean} - True if rate limited
+ */
+export const isRateLimited = (key, maxRequests = SECURITY.RATE_LIMIT_MAX_REQUESTS, windowMs = SECURITY.RATE_LIMIT_WINDOW_MS) => {
+  const now = Date.now();
+  const userRequests = rateLimitStore.get(key) || [];
+  
+  // Remove old requests outside the window
+  const recentRequests = userRequests.filter(timestamp => now - timestamp < windowMs);
+  
+  if (recentRequests.length >= maxRequests) {
+    return true;
   }
-  const salt = await bcrypt.genSalt(SALT_ROUNDS);
-  return bcrypt.hash(String(pin).trim(), salt);
+  
+  // Add current request
+  recentRequests.push(now);
+  rateLimitStore.set(key, recentRequests);
+  
+  return false;
 };
 
 /**
- * Verify a PIN against a hashed PIN
- * @param {string|number} pin - The PIN to verify
- * @param {string} hashedPin - The hashed PIN to compare against
- * @returns {Promise<boolean>} - True if PIN matches
+ * Clear rate limit for a key
+ * @param {string} key - Unique identifier
  */
-export const verifyPin = async (pin, hashedPin) => {
-  if (!validatePin(pin)) {
-    return false;
-  }
-  try {
-    return bcrypt.compare(String(pin).trim(), hashedPin);
-  } catch (error) {
-    console.error('[Security] PIN verification error:', error.message);
-    return false;
-  }
+export const clearRateLimit = (key) => {
+  rateLimitStore.delete(key);
+};
+
+// ==========================================
+// SESSION MANAGEMENT
+// ==========================================
+
+const sessionStore = new Map();
+
+/**
+ * Create a new session token
+ * @param {string} userId - User identifier
+ * @param {number} durationMs - Session duration in milliseconds
+ * @returns {string} - Session token
+ */
+export const createSession = (userId, durationMs = VALIDATION.SESSION_TIMEOUT_MINUTES * 60 * 1000) => {
+  const token = `${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+  
+  sessionStore.set(token, {
+    userId,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + durationMs,
+    lastActivity: Date.now(),
+  });
+  
+  return token;
 };
 
 /**
- * Hash a National ID using bcrypt
- * @param {string|number} nationalId - The National ID to hash
- * @returns {Promise<string>} - The hashed National ID
+ * Validate session token
+ * @param {string} token - Session token
+ * @returns {Object|null} - Session data or null if invalid
  */
-export const hashNationalId = async (nationalId) => {
-  if (nationalId === null || nationalId === undefined) {
-    throw new Error('National ID is required');
+export const validateSession = (token) => {
+  const session = sessionStore.get(token);
+  
+  if (!session) return null;
+  
+  // Check if expired
+  if (Date.now() > session.expiresAt) {
+    sessionStore.delete(token);
+    return null;
   }
-  const nationalIdStr = String(nationalId).trim();
-  if (!/^\d{8}$/.test(nationalIdStr)) {
-    throw new Error('Invalid National ID: must be 8 digits');
-  }
-  const salt = await bcrypt.genSalt(SALT_ROUNDS);
-  return bcrypt.hash(nationalIdStr, salt);
+  
+  // Update last activity
+  session.lastActivity = Date.now();
+  sessionStore.set(token, session);
+  
+  return session;
 };
 
 /**
- * Verify a National ID against a hashed National ID
- * @param {string|number} nationalId - The National ID to verify
- * @param {string} hashedNationalId - The hashed National ID to compare against
- * @returns {Promise<boolean>} - True if National ID matches
+ * Invalidate session
+ * @param {string} token - Session token
  */
-export const verifyNationalId = async (nationalId, hashedNationalId) => {
-  if (nationalId === null || nationalId === undefined) {
-    return false;
-  }
-  const nationalIdStr = String(nationalId).trim();
-  if (!/^\d{8}$/.test(nationalIdStr)) {
-    return false;
-  }
-  try {
-    return bcrypt.compare(nationalIdStr, hashedNationalId);
-  } catch (error) {
-    console.error('[Security] National ID verification error:', error.message);
-    return false;
-  }
+export const invalidateSession = (token) => {
+  sessionStore.delete(token);
 };
 
 /**
- * Normalize a full name by trimming and converting to uppercase
- * @param {string} name - The name to normalize
- * @returns {string} - Normalized name in uppercase
+ * Clean up expired sessions
  */
-export const normalizeFullName = (name) => {
-  if (!name || typeof name !== 'string') return '';
-  return name.trim().toUpperCase();
-};
-
-/**
- * Mask a National ID for display purposes
- * Shows only the last 2 digits, e.g., "******78"
- * @param {string|number} nationalId - The National ID to mask
- * @returns {string} - Masked National ID
- */
-export const maskNationalId = (nationalId) => {
-  if (nationalId === null || nationalId === undefined) return '******';
-  const nationalIdStr = String(nationalId).trim();
-  if (nationalIdStr.length <= 2) {
-    return '**';
+export const cleanupSessions = () => {
+  const now = Date.now();
+  for (const [token, session] of sessionStore.entries()) {
+    if (now > session.expiresAt) {
+      sessionStore.delete(token);
+    }
   }
-  const visiblePart = nationalIdStr.slice(-2);
-  const maskedLength = nationalIdStr.length - 2;
-  return '*'.repeat(maskedLength) + visiblePart;
+};
+
+// Run cleanup every 5 minutes
+setInterval(cleanupSessions, 5 * 60 * 1000);
+
+// ==========================================
+// REPLAY ATTACK PROTECTION
+// ==========================================
+
+const usedNonces = new Set();
+
+/**
+ * Generate a unique nonce for transaction
+ * @param {string} userId - User identifier
+ * @returns {string} - Unique nonce
+ */
+export const generateNonce = (userId) => {
+  const nonce = `${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+  return nonce;
 };
 
 /**
- * Mask a National ID hash for display (shows last 2 chars of hash)
- * Used when only the hash is available
- * @param {string} hashedNationalId - The hashed National ID
- * @returns {string} - Masked representation
+ * Check if nonce has been used (prevent replay attacks)
+ * @param {string} nonce - Nonce to check
+ * @returns {boolean} - True if nonce was already used
  */
-export const maskNationalIdFromHash = (hashedNationalId) => {
-  if (!hashedNationalId) return '******';
-  // For hashed IDs, we can't extract the original, so we show a generic mask
-  // The maskedNationalId should be stored separately during registration
-  return '********';
+export const isNonceUsed = (nonce) => {
+  return usedNonces.has(nonce);
 };
 
 /**
- * Validate password strength
- * Requirements:
- * - Minimum 10 characters
- * - Must contain uppercase letter
- * - Must contain lowercase letter
- * - Must contain number
- * - Must contain special character
- * @param {string} password - The password to validate
- * @returns {Object} - { valid: boolean, errors: string[] }
+ * Mark nonce as used
+ * @param {string} nonce - Nonce to mark
  */
-export const validatePassword = (password) => {
+export const useNonce = (nonce) => {
+  usedNonces.add(nonce);
+  
+  // Limit store size
+  if (usedNonces.size > 10000) {
+    const arr = Array.from(usedNonces);
+    usedNonces.clear();
+    arr.slice(-5000).forEach(n => usedNonces.add(n));
+  }
+};
+
+// ==========================================
+// SUSPICIOUS ACTIVITY DETECTION
+// ==========================================
+
+const activityLog = [];
+const MAX_ACTIVITY_LOG = 1000;
+
+/**
+ * Log user activity for suspicious behavior detection
+ * @param {string} userId - User identifier
+ * @param {string} action - Action performed
+ * @param {Object} metadata - Additional metadata
+ */
+export const logActivity = (userId, action, metadata = {}) => {
+  const entry = {
+    userId,
+    action,
+    metadata,
+    timestamp: Date.now(),
+    id: `${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+  };
+  
+  activityLog.push(entry);
+  
+  // Limit log size
+  if (activityLog.length > MAX_ACTIVITY_LOG) {
+    activityLog.splice(0, activityLog.length - MAX_ACTIVITY_LOG);
+  }
+  
+  return entry;
+};
+
+/**
+ * Detect suspicious activity patterns
+ * @param {string} userId - User identifier
+ * @returns {Object} - Suspicious activity report
+ */
+export const detectSuspiciousActivity = (userId) => {
+  const now = Date.now();
+  const recentActivity = activityLog.filter(
+    entry => entry.userId === userId && now - entry.timestamp < 60000 // Last minute
+  );
+  
+  const report = {
+    isSuspicious: false,
+    reasons: [],
+    activityCount: recentActivity.length,
+  };
+  
+  // Check for rapid-fire requests
+  if (recentActivity.length > 30) {
+    report.isSuspicious = true;
+    report.reasons.push('Rapid-fire requests detected');
+  }
+  
+  // Check for repeated failed actions
+  const failedActions = recentActivity.filter(a => a.metadata.success === false);
+  if (failedActions.length > 5) {
+    report.isSuspicious = true;
+    report.reasons.push('Multiple failed actions');
+  }
+  
+  // Check for action diversity (potential bot behavior)
+  const uniqueActions = new Set(recentActivity.map(a => a.action));
+  if (uniqueActions.size > 10 && recentActivity.length > 20) {
+    report.isSuspicious = true;
+    report.reasons.push('Unusual action diversity');
+  }
+  
+  return report;
+};
+
+/**
+ * Get activity log for user
+ * @param {string} userId - User identifier
+ * @param {number} limit - Maximum entries to return
+ * @returns {Array} - Activity entries
+ */
+export const getUserActivity = (userId, limit = 50) => {
+  return activityLog
+    .filter(entry => entry.userId === userId)
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, limit);
+};
+
+// ==========================================
+// TRANSACTION SECURITY
+// ==========================================
+
+/**
+ * Validate transaction parameters
+ * @param {Object} txParams - Transaction parameters
+ * @returns {Object} - Validation result
+ */
+export const validateTransaction = (txParams) => {
   const errors = [];
   
-  if (!password || typeof password !== 'string') {
-    return { valid: false, errors: ['Password is required'] };
+  if (!txParams.to || !isValidWalletAddress(txParams.to)) {
+    errors.push('Invalid recipient address');
   }
   
-  if (password.length < 10) {
-    errors.push('Password must be at least 10 characters long');
+  if (txParams.value !== undefined) {
+    const value = Number(txParams.value);
+    if (isNaN(value) || value < 0) {
+      errors.push('Invalid transaction value');
+    }
   }
   
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter');
-  }
-  
-  if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain at least one lowercase letter');
-  }
-  
-  if (!/\d/.test(password)) {
-    errors.push('Password must contain at least one number');
-  }
-  
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    errors.push('Password must contain at least one special character');
+  if (txParams.data && typeof txParams.data !== 'string') {
+    errors.push('Invalid transaction data');
   }
   
   return {
-    valid: errors.length === 0,
-    errors
+    isValid: errors.length === 0,
+    errors,
   };
 };
 
 /**
- * Hash a password using bcrypt
- * @param {string} password - The password to hash
- * @returns {Promise<string>} - The hashed password
+ * Create transaction confirmation hash
+ * @param {Object} txData - Transaction data
+ * @returns {string} - Confirmation hash
  */
-export const hashPassword = async (password) => {
-  const validation = validatePassword(password);
-  if (!validation.valid) {
-    throw new Error(`Invalid password: ${validation.errors.join(', ')}`);
+export const createConfirmationHash = async (txData) => {
+  const data = JSON.stringify(txData, Object.keys(txData).sort());
+  
+  // Simple hash function (in production, use Web3 hashing)
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
   }
   
-  const salt = await bcrypt.genSalt(SALT_ROUNDS);
-  return bcrypt.hash(password, salt);
+  return `0x${Math.abs(hash).toString(16).padStart(64, '0')}`;
+};
+
+// ==========================================
+// ERROR HANDLING
+// ==========================================
+
+/**
+ * Sanitize error messages for public display
+ * @param {Error} error - Error object
+ * @returns {string} - Safe error message
+ */
+export const sanitizeErrorMessage = (error) => {
+  if (!error) return 'An unknown error occurred';
+  
+  const message = typeof error === 'string' ? error : error.message || 'Unknown error';
+  
+  // Remove potentially sensitive information
+  let safeMessage = message
+    .replace(/0x[a-fA-F0-9]{64}/g, '[HASH]') // Hide hashes
+    .replace(/0x[a-fA-F0-9]{40}/g, '[ADDRESS]') // Hide addresses
+    .replace(/private[_\s]*key/gi, '[REDACTED]') // Hide private key references
+    .replace(/secret/gi, '[REDACTED]') // Hide secret references
+    .replace(/password/gi, '[REDACTED]') // Hide password references
+    .replace(/mnemonic/gi, '[REDACTED]') // Hide mnemonic references
+    .substring(0, 200); // Limit length
+  
+  return sanitizeInput(safeMessage);
 };
 
 /**
- * Verify a password against a hashed password
- * @param {string} password - The password to verify
- * @param {string} hashedPassword - The hashed password to compare against
- * @returns {Promise<boolean>} - True if password matches
+ * Log security event
+ * @param {string} eventType - Type of security event
+ * @param {Object} data - Event data
  */
-export const verifyPassword = async (password, hashedPassword) => {
-  if (!password || !hashedPassword) {
-    return false;
+export const logSecurityEvent = (eventType, data) => {
+  console.warn(`[SECURITY] ${eventType}:`, {
+    timestamp: new Date().toISOString(),
+    ...data,
+  });
+};
+
+// ==========================================
+// PASSWORD VALIDATION & HASHING
+// ==========================================
+
+/**
+ * Validate password strength
+ * NOTE: This is for frontend demo-level password validation only.
+ * Real production password validation and hashing must be handled server-side
+ * with a proper backend and secure password hashing algorithms (bcrypt, argon2).
+ * 
+ * @param {string} password - Password to validate
+ * @returns {Object} Validation result with isValid, errors, and strength
+ */
+export const validatePassword = (password) => {
+  const errors = [];
+  let strengthScore = 0;
+
+  if (!password || typeof password !== 'string') {
+    return {
+      isValid: false,
+      errors: ['Password is required'],
+      strength: 'weak',
+    };
   }
-  
+
+  // Minimum 8 characters
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters long');
+  } else if (password.length >= 12) {
+    strengthScore += 2;
+  } else {
+    strengthScore += 1;
+  }
+
+  // Require uppercase letter
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  } else {
+    strengthScore += 1;
+  }
+
+  // Require lowercase letter
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  } else {
+    strengthScore += 1;
+  }
+
+  // Require number
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  } else {
+    strengthScore += 1;
+  }
+
+  // Require special character
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('Password must contain at least one special character');
+  } else {
+    strengthScore += 1;
+  }
+
+  // Determine strength
+  let strength = 'weak';
+  if (strengthScore >= 4) {
+    strength = 'strong';
+  } else if (strengthScore >= 3) {
+    strength = 'medium';
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    strength,
+  };
+};
+
+/**
+ * Hash password using browser crypto API (SHA-256)
+ * 
+ * ⚠️ IMPORTANT: This is for frontend demo-level password handling only.
+ * Real production password hashing MUST be handled server-side with proper
+ * password hashing algorithms like bcrypt, scrypt, or argon2.
+ * SHA-256 is NOT suitable for password storage in production as it's
+ * too fast and vulnerable to brute force attacks.
+ * 
+ * @param {string} password - Plain text password to hash
+ * @returns {Promise<string>} SHA-256 hash as hex string
+ */
+export const hashPassword = async (password) => {
+  if (!password || typeof password !== 'string') {
+    throw new Error('Password is required');
+  }
+
   try {
-    return bcrypt.compare(password, hashedPassword);
+    // Use Web Crypto API if available (modern browsers)
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return `0x${hashHex}`;
+    }
+    
+    // Fallback: Simple hash for environments without crypto.subtle
+    // NOTE: This is NOT cryptographically secure and should only be used
+    // as a last resort fallback for demo purposes.
+    console.warn('[SECURITY] crypto.subtle not available, using fallback hash (NOT SECURE)');
+    let hash = 0;
+    for (let i = 0; i < password.length; i++) {
+      const char = password.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return `0x${Math.abs(hash).toString(16).padStart(64, '0')}`;
   } catch (error) {
-    console.error('[Security] Password verification error:', error.message);
-    return false;
+    console.error('[SECURITY] Error hashing password:', error);
+    throw new Error('Failed to hash password');
   }
 };
 
 export default {
-  hashPin,
-  verifyPin,
-  hashNationalId,
-  verifyNationalId,
-  normalizeFullName,
-  maskNationalId,
-  maskNationalIdFromHash,
-  validatePin,
+  sanitizeInput,
+  sanitizeObject,
+  isValidWalletAddress,
+  normalizeWalletAddress,
+  isRateLimited,
+  clearRateLimit,
+  createSession,
+  validateSession,
+  invalidateSession,
+  generateNonce,
+  isNonceUsed,
+  useNonce,
+  logActivity,
+  detectSuspiciousActivity,
+  getUserActivity,
+  validateTransaction,
+  createConfirmationHash,
+  sanitizeErrorMessage,
+  logSecurityEvent,
   validatePassword,
   hashPassword,
-  verifyPassword,
 };

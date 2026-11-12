@@ -35,18 +35,6 @@ const ResultsPage = ({
   const [resultsLoading, setResultsLoading] = useState(true);
   const [resultsError, setResultsError] = useState("");
 
-  // DEBUG: Show state on page
-  const debugState = {
-    loading: resultsLoading,
-    candidatesCount: candidates?.length || 0,
-    electionStarted,
-    electionEnded,
-    parentLoading,
-    voterArea: voter,
-  };
-
-  console.log("[ResultsPage] State:", debugState);
-
   // Position tabs configuration - matching the standardized positions
   const positionTabs = [
     { id: "All", label: "All Positions" },
@@ -796,11 +784,6 @@ const ResultsPage = ({
           </div>
         </section>
       )}
-
-      {/* DEBUG STATE DISPLAY */}
-      <div className="fixed bottom-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg text-xs font-mono z-50">
-        <pre>{JSON.stringify(debugState, null, 2)}</pre>
-      </div>
 
       {/* Footer info */}
       <footer className="py-8 bg-white border-t border-gray-200">

@@ -37,6 +37,7 @@ const ElectionDashboard = ({
   getWinnersByPosition,
   hasVotedForPosition,
   canVoteForPosition,
+  isAdmin = false, // Admin flag - admin doesn't need voter registration
 }) => {
   // Defensive guard: Ensure candidates is always an array
   const safeCandidates = Array.isArray(candidates) ? candidates : [];
@@ -47,32 +48,15 @@ const ElectionDashboard = ({
   // Defensive guard: Ensure voterInfo is an object
   const safeVoterInfo = voterInfo && typeof voterInfo === 'object' ? voterInfo : {};
 
-  const isRegistered = safeVoterInfo?.isRegistered;
-
-  // Debug logging
-  useEffect(() => {
-    console.log('[ElectionDashboard] Props:', {
-      voter: safeVoter,
-      candidatesCount: safeCandidates.length,
-      hasVoted,
-      isRegistered,
-      electionStarted,
-      electionEnded,
-    });
-  }, [safeVoter, safeCandidates.length, hasVoted, isRegistered, electionStarted, electionEnded]);
+  // Admin does not need to be registered as a voter - they have admin access
+  const isRegistered = isAdmin ? true : safeVoterInfo?.isRegistered;
 
   // Filter candidates based on voter location
   const filteredCandidates = useMemo(() => {
-    console.log('[ElectionDashboard] Filtering candidates for voter:', safeVoter);
     const filtered = filterCandidatesForVoter(safeCandidates, safeVoter);
-    console.log('[ElectionDashboard] Filtered candidates:', filtered.length);
     return filtered;
   }, [safeCandidates, safeVoter]);
 
-  // Group filtered candidates by position
-  const candidatesByPosition = useMemo(() => {
-    return groupCandidatesByPosition(filteredCandidates);
-  }, [filteredCandidates]);
 
   // Get position counts
   const positionCounts = useMemo(() => {
@@ -273,8 +257,8 @@ const ElectionDashboard = ({
           </div>
         )}
 
-        {/* Not Registered Warning */}
-        {!isRegistered && (
+        {/* Not Registered Warning - hide for admin */}
+        {!isRegistered && !isAdmin && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 mb-6">
             <div className="flex items-start space-x-3">
               <span className="text-yellow-600 text-xl">ℹ️</span>

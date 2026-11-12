@@ -1,16 +1,48 @@
 import { connectWallet } from './connectWallet';
+import serializeBigInt from './serializeBigInt';
 
 /**
  * Admin Actions Utility Functions
  * All functions use ethers.js v6 and the existing connectWallet() function
+ * 
+ * SECURITY: Uses the DeVoteNational contract's custom RBAC system via getUserRole()
+ * instead of OpenZeppelin's hasRole(). The contract uses Role enum values where
+ * SuperAdmin = 8, NationalElectionCommissioner = 7, etc.
  */
+
+import { SUPER_ADMIN_ROLE } from '../config/roleConstants';
+
+/**
+ * Check if the connected wallet is the Super Admin using the contract's custom RBAC
+ * @param {object} contract - The contract instance
+ * @param {string} address - The wallet address to check
+ * @returns {Promise<boolean>} - True if the wallet holds SuperAdmin role
+ */
+const isSuperAdminFromContract = async (contract, address) => {
+  try {
+    // Use getUserRole() which IS in the deployed ABI
+    // This returns: (role, county, constituency, ward, active, assignedAt, assignedBy)
+    const roleData = await contract.getUserRole(address);
+    const roleIndex = Number(roleData.role);
+    const isActive = roleData.active === true;
+    
+    // Check if the user has SuperAdmin role (index 8) AND is active
+    return roleIndex === SUPER_ADMIN_ROLE && isActive;
+  } catch (err) {
+    console.error('[adminActions] Error checking Super Admin role:', err);
+    return false;
+  }
+};
 
 /**
  * Register a single voter (idempotent - safe to call multiple times)
  * @param {string} voterAddress - The wallet address to register
+ * @param {string} county - Voter's county (default: '')
+ * @param {string} constituency - Voter's constituency (default: '')
+ * @param {string} ward - Voter's ward (default: '')
  * @returns {Promise<{success: boolean, alreadyRegistered?: boolean}>} - Success status
  */
-export const registerVoter = async (voterAddress) => {
+export const registerVoter = async (voterAddress, county = '', constituency = '', ward = '') => {
   try {
     const wallet = await connectWallet();
     if (!wallet) {
@@ -19,10 +51,13 @@ export const registerVoter = async (voterAddress) => {
 
     const { contract } = wallet;
     
-    // Check if the connected wallet is the admin
-    const adminAddress = await contract.admin();
-    if (wallet.address.toLowerCase() !== adminAddress.toLowerCase()) {
-      throw new Error("Only admin can register voters");
+    // Check if the connected wallet is the Super Admin using the contract's custom RBAC
+    const hasSuperAdminRole = await isSuperAdminFromContract(contract, wallet.address);
+    console.log("[adminActions] Connected wallet:", wallet.address);
+    console.log("[adminActions] Is Super Admin (role 8):", hasSuperAdminRole);
+    
+    if (!hasSuperAdminRole) {
+      throw new Error("Only the Super Admin can perform this action.");
     }
 
     // Normalize address to lowercase
@@ -31,8 +66,7 @@ export const registerVoter = async (voterAddress) => {
     // Check if voter is already registered on-chain first
     console.log(`[adminActions] Checking if voter is already registered: ${normalizedAddress}`);
     try {
-      const voterInfo = await contract.getVoterInfo(normalizedAddress);
-      const isRegistered = Array.isArray(voterInfo) ? voterInfo[0] : voterInfo?.isRegistered;
+      const isRegistered = await contract.registeredVoters(normalizedAddress);
       
       if (isRegistered) {
         console.log(`[adminActions] Voter already registered on-chain, skipping: ${normalizedAddress}`);
@@ -44,8 +78,10 @@ export const registerVoter = async (voterAddress) => {
     }
 
     // Voter not registered, proceed with registration
-    console.log(`[adminActions] Registering voter on blockchain: ${normalizedAddress}`);
-    const tx = await contract.registerVoter(normalizedAddress);
+    // FIX: Pass ALL 4 required parameters to contract.registerVoter()
+    // The contract expects: registerVoter(address _voter, string _county, string _constituency, string _ward)
+    console.log(`[adminActions] Registering voter on blockchain: ${normalizedAddress}`, { county, constituency, ward });
+    const tx = await contract.registerVoter(normalizedAddress, county, constituency, ward);
     await tx.wait();
     
     console.log(`Successfully registered voter: ${normalizedAddress}`);
@@ -131,12 +167,17 @@ export const startElection = async () => {
 
     const { contract } = wallet;
     
-    // Check if the connected wallet is the admin
-    const adminAddress = await contract.admin();
-    if (wallet.address.toLowerCase() !== adminAddress.toLowerCase()) {
-      throw new Error("Only admin can start the election");
+    // Check if the connected wallet is the Super Admin using the contract's custom RBAC
+    const hasSuperAdminRole = await isSuperAdminFromContract(contract, wallet.address);
+    console.log("[adminActions] Connected wallet:", wallet.address);
+    console.log("[adminActions] Is Super Admin (role 8):", hasSuperAdminRole);
+    
+    if (!hasSuperAdminRole) {
+      throw new Error("Only the Super Admin can perform this action.");
     }
 
+    // FIX: Call the public startElection() function directly (SuperAdmin only).
+    // The contract has a public startElection() that bypasses multi-sig for SuperAdmin.
     const tx = await contract.startElection();
     await tx.wait();
     
@@ -172,12 +213,17 @@ export const endElection = async () => {
 
     const { contract } = wallet;
     
-    // Check if the connected wallet is the admin
-    const adminAddress = await contract.admin();
-    if (wallet.address.toLowerCase() !== adminAddress.toLowerCase()) {
-      throw new Error("Only admin can end the election");
+    // Check if the connected wallet is the Super Admin using the contract's custom RBAC
+    const hasSuperAdminRole = await isSuperAdminFromContract(contract, wallet.address);
+    console.log("[adminActions] Connected wallet:", wallet.address);
+    console.log("[adminActions] Is Super Admin (role 8):", hasSuperAdminRole);
+    
+    if (!hasSuperAdminRole) {
+      throw new Error("Only the Super Admin can perform this action.");
     }
 
+    // FIX: Call the public endElection() function directly (SuperAdmin only).
+    // The contract has a public endElection() that bypasses multi-sig for SuperAdmin.
     const tx = await contract.endElection();
     await tx.wait();
     
@@ -205,9 +251,13 @@ export const endElection = async () => {
 /**
  * Add a candidate to the election
  * @param {string} candidateName - The name of the candidate
+ * @param {number} positionIndex - Position index (0=President, 1=Governor, 2=Senator, 3=WomanRep, 4=MP, 5=MCA)
+ * @param {string} county - Candidate's county (empty for President)
+ * @param {string} constituency - Candidate's constituency (empty for President/Governor/Senator/WomanRep)
+ * @param {string} ward - Candidate's ward (empty for President/Governor/Senator/WomanRep/MP)
  * @returns {Promise<boolean>} - Success status
  */
-export const addCandidate = async (candidateName) => {
+export const addCandidate = async (candidateName, positionIndex = 0, county = '', constituency = '', ward = '') => {
   try {
     const wallet = await connectWallet();
     if (!wallet) {
@@ -216,13 +266,18 @@ export const addCandidate = async (candidateName) => {
 
     const { contract } = wallet;
     
-    // Check if the connected wallet is the admin
-    const adminAddress = await contract.admin();
-    if (wallet.address.toLowerCase() !== adminAddress.toLowerCase()) {
-      throw new Error("Only admin can add candidates");
+    // Check if the connected wallet is the Super Admin using the contract's custom RBAC
+    const hasSuperAdminRole = await isSuperAdminFromContract(contract, wallet.address);
+    console.log("[adminActions] Connected wallet:", wallet.address);
+    console.log("[adminActions] Is Super Admin (role 8):", hasSuperAdminRole);
+    
+    if (!hasSuperAdminRole) {
+      throw new Error("Only the Super Admin can perform this action.");
     }
 
-    const tx = await contract.addCandidate(candidateName);
+    // FIX: Pass ALL 5 required parameters to contract.addCandidate()
+    // The contract expects: addCandidate(string _name, uint256 _position, string _county, string _constituency, string _ward)
+    const tx = await contract.addCandidate(candidateName, positionIndex, county, constituency, ward);
     await tx.wait();
     
     console.log(`Successfully added candidate: ${candidateName}`);
@@ -258,9 +313,12 @@ export const isAdmin = async () => {
     }
 
     const { contract, address } = wallet;
-    const adminAddress = await contract.admin();
+    const result = await isSuperAdminFromContract(contract, address);
     
-    return address.toLowerCase() === adminAddress.toLowerCase();
+    console.log("[adminActions] isAdmin check - Connected wallet:", address);
+    console.log("[adminActions] isAdmin check - Is Super Admin (role 8):", result);
+    
+    return result;
   } catch (error) {
     console.error("Error checking admin status:", error);
     return false;
@@ -279,7 +337,14 @@ export const getAdminAddress = async () => {
     }
 
     const { contract } = wallet;
-    return await contract.admin();
+    // Try to get owner from state variable first
+    try {
+      return await contract.owner();
+    } catch (ownerErr) {
+      // If owner() doesn't exist, return null or throw a more specific error
+      console.warn("contract.owner() not available, admin address cannot be retrieved directly");
+      throw new Error("Admin address not directly accessible via contract.owner()");
+    }
   } catch (error) {
     console.error("Error getting admin address:", error);
     throw error;
@@ -343,8 +408,10 @@ export const testAdminActions = async () => {
     }
 
     // Test add candidate
+    // FIX: Pass all 5 required parameters (name, positionIndex, county, constituency, ward)
+    // Using positionIndex=0 (President) with empty geo data which is valid per contract validation
     try {
-      await addCandidate("Test Candidate");
+      await addCandidate("Test Candidate", 0, '', '', '');
       results.addCandidate = true;
     } catch (error) {
       results.errors.push(`Add candidate error: ${error.message}`);

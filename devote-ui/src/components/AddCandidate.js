@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { POSITIONS, POSITION_NAMES, getPositionIndex } from '../utils/electionFilters';
 import { counties, constituencies, wards } from '../data/kenyaLocations';
+import { validatePhotoFile, uploadCandidatePhoto } from '../services/storageService';
 
 // Position options for dropdown
 const POSITION_OPTIONS = [
@@ -44,6 +45,12 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
   const [status, setStatus] = useState('');
   const [availableConstituencies, setAvailableConstituencies] = useState([]);
   const [availableWards, setAvailableWards] = useState([]);
+  
+  // Photo state
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   const fields = getRequiredFields(formData.position);
 
@@ -68,9 +75,56 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
     setFormData(prev => ({ ...prev, ward: '' }));
   }, [formData.constituency]);
 
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+      }
+    };
+  }, [photoPreview]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate the file
+    const validation = validatePhotoFile(file);
+    if (!validation.valid) {
+      setPhotoError(validation.error);
+      setSelectedPhoto(null);
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+        setPhotoPreview(null);
+      }
+      return;
+    }
+
+    setPhotoError('');
+    setSelectedPhoto(file);
+    
+    // Create preview
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+    }
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemovePhoto = () => {
+    setSelectedPhoto(null);
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+      setPhotoPreview(null);
+    }
+    setPhotoError('');
+    // Reset the file input
+    const fileInput = document.getElementById('candidate-photo-upload');
+    if (fileInput) fileInput.value = '';
   };
 
   const validateForm = () => {
@@ -108,6 +162,20 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
       
       const positionIndex = getPositionIndex(formData.position);
       
+      // Process photo if selected - uses Base64 conversion (no Firebase Storage)
+      let photoUrl = formData.imageUrl || '';
+      if (selectedPhoto) {
+        setIsProcessingPhoto(true);
+        setStatus("Processing Image...");
+        
+        const tempId = `temp_${Date.now()}`;
+        photoUrl = await uploadCandidatePhoto(selectedPhoto, tempId);
+        
+        setIsProcessingPhoto(false);
+      }
+      
+      setStatus("Creating Candidate...");
+      
       const candidateData = {
         name: formData.name.trim(),
         party: formData.party.trim(),
@@ -117,13 +185,13 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
         constituency: formData.constituency || '',
         ward: formData.ward || '',
         candidateCode: formData.candidateCode || '',
-        imageUrl: formData.imageUrl || '',
+        imageUrl: photoUrl,
       };
 
       console.log('[AddCandidate] Adding candidate:', candidateData);
       
       await onAddCandidate(candidateData);
-      setStatus("Candidate added successfully!");
+      setStatus("Candidate Added Successfully.");
       
       // Reset form
       setFormData({
@@ -136,9 +204,12 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
         candidateCode: '',
         imageUrl: '',
       });
+      handleRemovePhoto();
     } catch (err) {
       console.error(err);
       setStatus("Failed to add candidate: " + (err.message || "Unknown error"));
+    } finally {
+      setIsProcessingPhoto(false);
     }
   };
 
@@ -281,33 +352,105 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
           </p>
         </div>
 
-        {/* Image URL (Optional) */}
+        {/* Candidate Photograph Upload */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Image URL (Optional)
+            Candidate Photograph
           </label>
-          <input
-            type="url"
-            name="imageUrl"
-            value={formData.imageUrl}
-            onChange={handleInputChange}
-            placeholder="https://example.com/candidate-photo.jpg"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
-            disabled={isLoading}
-          />
+          
+          {!photoPreview ? (
+            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-primary-500 transition-colors">
+              <div className="space-y-1 text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  stroke="currentColor"
+                  fill="none"
+                  viewBox="0 0 48 48"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <div className="flex text-sm text-gray-600">
+                  <label
+                    htmlFor="candidate-photo-upload"
+                    className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
+                  >
+                    <span>Upload Image</span>
+                    <input
+                      id="candidate-photo-upload"
+                      name="candidate-photo"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handlePhotoSelect}
+                      className="sr-only"
+                      disabled={isLoading || isProcessingPhoto}
+                    />
+                  </label>
+                  <p className="pl-1">or drag and drop</p>
+                </div>
+                <p className="text-xs text-gray-500">
+                  JPG, JPEG, PNG, or WEBP up to 5 MB
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-1">
+              {/* Photo Preview */}
+              <div className="relative inline-block">
+                <img
+                  src={photoPreview}
+                  alt="Candidate preview"
+                  className="h-48 w-48 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+                  disabled={isLoading || isProcessingPhoto}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Click the X to remove and select a different image
+              </p>
+            </div>
+          )}
+
+          {/* Processing indicator (replaces old upload progress bar) */}
+          {isProcessingPhoto && (
+            <div className="mt-3">
+              <div className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
+                <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>Processing Image...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Photo Error */}
+          {photoError && (
+            <p className="mt-2 text-sm text-red-600">{photoError}</p>
+          )}
         </div>
 
         {/* Submit Button */}
         <div className="flex space-x-4">
           <button
             onClick={handleAddCandidate}
-            disabled={isLoading || !formData.name.trim()}
+            disabled={isLoading || isProcessingPhoto || !formData.name.trim()}
             className="flex-1 px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-ring"
           >
-            {isLoading ? (
+            {isLoading || isProcessingPhoto ? (
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Processing...</span>
+                <span>{isProcessingPhoto ? 'Processing Image...' : 'Processing...'}</span>
               </div>
             ) : (
               "Add Candidate"
@@ -318,7 +461,7 @@ const AddCandidate = ({ contract, isLoading, onAddCandidate }) => {
         {/* Status Message */}
         {status && (
           <div className={`p-3 rounded-lg ${
-            status.includes("successfully") || status.includes("success")
+            status.includes("Successfully") || status.includes("success")
               ? "bg-green-50 border border-green-200 text-green-800" 
               : "bg-red-50 border border-red-200 text-red-800"
           }`}>

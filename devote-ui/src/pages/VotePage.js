@@ -47,7 +47,14 @@ const VotePage = ({
   networkError,
   contractLoading,
   electionLoading,
-  adminLoading,
+  adminLoading = false,
+  // Admin verification state
+  adminVerified = false,
+  // Super Admin authorization props
+  isSuperAdmin = false,
+  isSuperAdminVerified = false,
+  userRole = null,
+  userRoleData = null,
   // Voter location callback for area-based filtering
   onVoterLogin,
 }) => {
@@ -145,7 +152,7 @@ const VotePage = ({
     if (!voterForm.nationalId.trim()) {
       errors.nationalId = 'National ID number is required';
     } else if (!/^\d{8}$/.test(voterForm.nationalId.trim())) {
-      errors.nationalId = 'Enter a valid 8-digit National ID number';
+      errors.nationalId = 'National ID must contain 7 to 9 digits';
     }
     if (!voterForm.pin.trim()) {
       errors.pin = 'Voting PIN is required';
@@ -263,7 +270,10 @@ const VotePage = ({
   const shouldShowLoginForm = showSignInSection && !voterLoggedIn && !staffLoggedIn;
   const shouldShowVoterBallot = voterLoggedIn && !isAdmin;
   const shouldShowAdminPanel = staffLoggedIn && isAdmin;
-  const shouldShowAdminDenied = staffLoggedIn && !isAdmin;
+  // Only show "Access Denied" after admin verification is complete
+  // If still loading, show "Verifying..." instead
+  const shouldShowAdminDenied = staffLoggedIn && !isAdmin && adminVerified;
+  const shouldShowAdminVerifying = staffLoggedIn && !adminVerified;
 
   const combinedError = networkError || error || "";
 
@@ -440,8 +450,8 @@ const VotePage = ({
                         name="nationalId"
                         value={voterForm.nationalId}
                         onChange={handleVoterInputChange}
-                        placeholder="e.g. 12345678"
-                        maxLength={8}
+                        placeholder="e.g. 1234567"
+                        maxLength={9}
                         className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition-all ${
                           voterFormErrors.nationalId ? 'border-red-300 bg-red-50' : 'border-gray-300'
                         }`}
@@ -690,6 +700,7 @@ const VotePage = ({
             onVote={onVote}
             totalVotes={totalVotes}
             getVotePercentage={getVotePercentage}
+            isAdmin={isAdmin}
           />
         </div>
       )}
@@ -735,7 +746,53 @@ const VotePage = ({
               onRegisterVoter={onRegisterVoter}
               onBulkRegisterVoters={onBulkRegisterVoters}
               onRefresh={onRefresh}
+              // Super Admin authorization props (CRITICAL: must be passed for election lifecycle controls)
+              isSuperAdmin={isSuperAdmin}
+              isSuperAdminVerified={isSuperAdminVerified}
+              userRole={userRole}
+              userRoleName={userRoleData?.roleName || ''}
             />
+          </div>
+        </div>
+      )}
+
+      {/* ===== ADMIN VERIFICATION IN PROGRESS ===== */}
+      {shouldShowAdminVerifying && (
+        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-blue-200 p-8 max-w-md w-full text-center">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg
+                className="w-10 h-10 text-blue-600 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.051M4.001 12a8 8 0 1115.987 1.463M20 12a8 8 0 11-15.987-1.463M19.999 20v-5h-.051"
+                />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              Verifying Administrator Privileges...
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Please wait while we verify your wallet permissions.
+            </p>
+            
+            {/* Wallet and Admin Address Display */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm text-gray-600 mb-2">
+                <span className="font-semibold">Connected wallet:</span>{" "}
+                <span className="font-mono text-xs">{account || "Not connected"}</span>
+              </p>
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold">Admin wallet:</span>{" "}
+                <span className="font-mono text-xs">{adminAddress || "Loading..."}</span>
+              </p>
+            </div>
           </div>
         </div>
       )}

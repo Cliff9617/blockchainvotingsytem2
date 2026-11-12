@@ -1,5 +1,6 @@
 import React from "react";
 import { getPositionDisplayName, getWinnerAreaDescription } from "../utils/electionFilters";
+import { getCandidateImage } from "../utils/getCandidateImage";
 
 /**
  * SimpleCandidateCard - Redesigned for maximum simplicity and voter clarity
@@ -47,7 +48,8 @@ const SimpleCandidateCard = ({
     return name.charAt(0).toUpperCase();
   };
 
-  const imageUrl = candidate?.imageUrl;
+  const candidateImage = getCandidateImage(candidate);
+  const hasImage = candidate?.candidatePhoto || candidate?.imageData || candidate?.imageUrl;
 
   // Determine card styling based on status
   const getCardClasses = () => {
@@ -134,9 +136,9 @@ const SimpleCandidateCard = ({
       <div className="flex flex-col items-center text-center">
         {/* Candidate Photo/Avatar */}
         <div className="mb-4">
-          {imageUrl ? (
+          {hasImage ? (
             <img
-              src={imageUrl}
+              src={candidateImage}
               alt={candidateName}
               className="w-24 h-24 rounded-full object-cover shadow-lg border-4 border-white"
             />

@@ -1,5 +1,7 @@
-import { collection, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, getDoc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import serializeBigInt from '../utils/serializeBigInt';
+import { normalizePosition, POSITIONS, resolveVoterCountyName } from '../utils/electionFilters';
 
 const CANDIDATE_PROFILES_COLLECTION = 'candidates';
 
@@ -76,8 +78,171 @@ export const saveCandidateProfile = async (candidateData) => {
     return docRef.id;
   } catch (error) {
     console.error('[candidateService] Error saving candidate profile:', error);
-    console.error('[candidateService] Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    console.error('[candidateService] Full error:', JSON.stringify(serializeBigInt(error), Object.getOwnPropertyNames(error)));
     throw new Error('Failed to save candidate profile');
+  }
+};
+
+/**
+ * Query candidates by position for a specific jurisdiction
+ * Uses Firestore where() clauses for optimized querying - no client-side filtering needed
+ * @param {string} position - The position to query
+ * @param {Object} voter - Voter location { county, constituency, ward }
+ * @returns {Promise<Array>} - Array of candidate objects
+ */
+export const queryCandidatesByJurisdiction = async (position, voter = null) => {
+  try {
+    const normalizedPos = normalizePosition(position);
+    const constraints = [where('position', '==', normalizedPos)];
+    
+    // Add jurisdiction filters based on position type
+    switch (normalizedPos) {
+      case POSITIONS.PRESIDENT:
+        // President is national - no location filter needed
+        break;
+      case POSITIONS.GOVERNOR:
+      case POSITIONS.SENATOR:
+      case POSITIONS.WOMAN_REPRESENTATIVE:
+        if (voter?.county) {
+          // Handle county as number (IEBC ID) or string (name) - normalize to string for Firestore query
+          const countyValue = typeof voter.county === 'number' 
+            ? String(voter.county) 
+            : voter.county;
+          constraints.push(where('county', '==', countyValue));
+        }
+        break;
+      case POSITIONS.MEMBER_OF_PARLIAMENT:
+        if (voter?.constituency) {
+          constraints.push(where('constituency', '==', voter.constituency));
+        }
+        break;
+      case POSITIONS.MCA:
+        if (voter?.ward) {
+          constraints.push(where('ward', '==', voter.ward));
+        }
+        break;
+    }
+
+    const q = query(collection(db, CANDIDATE_PROFILES_COLLECTION), ...constraints);
+    const querySnapshot = await getDocs(q);
+    const profiles = [];
+    
+    querySnapshot.forEach((doc) => {
+      profiles.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    return profiles;
+  } catch (error) {
+    console.error(`Error querying candidates for position ${position}:`, error);
+    throw new Error('Failed to query candidates');
+  }
+};
+
+/**
+ * Optimized function to get all candidates a voter can vote for
+ * Combines President candidates with jurisdiction-specific candidates
+ * Uses Firestore queries instead of client-side filtering
+ * @param {Object} voter - Voter location { county, constituency, ward }
+ * @returns {Promise<Array>} - All candidates visible to the voter
+ */
+export const getVoterCandidates = async (voter) => {
+  try {
+    const allCandidates = [];
+    
+    // Always get President candidates (national)
+    const presidentCandidates = await queryCandidatesByJurisdiction(POSITIONS.PRESIDENT, voter);
+    allCandidates.push(...presidentCandidates);
+    
+    if (voter) {
+      // Get jurisdiction-specific candidates
+      if (voter.county) {
+        const governorCandidates = await queryCandidatesByJurisdiction(POSITIONS.GOVERNOR, voter);
+        allCandidates.push(...governorCandidates);
+        
+        const senatorCandidates = await queryCandidatesByJurisdiction(POSITIONS.SENATOR, voter);
+        allCandidates.push(...senatorCandidates);
+        
+        const womanRepCandidates = await queryCandidatesByJurisdiction(POSITIONS.WOMAN_REPRESENTATIVE, voter);
+        allCandidates.push(...womanRepCandidates);
+      }
+      
+      if (voter.constituency) {
+        const mpCandidates = await queryCandidatesByJurisdiction(POSITIONS.MEMBER_OF_PARLIAMENT, voter);
+        allCandidates.push(...mpCandidates);
+      }
+      
+      if (voter.ward) {
+        const mcaCandidates = await queryCandidatesByJurisdiction(POSITIONS.MCA, voter);
+        allCandidates.push(...mcaCandidates);
+      }
+    }
+    
+    return allCandidates;
+  } catch (error) {
+    console.error('Error getting voter candidates:', error);
+    throw new Error('Failed to get voter candidates');
+  }
+};
+
+/**
+ * Validate that a candidate belongs to the voter's jurisdiction
+ * @param {Object} candidate - Candidate object
+ * @param {Object} voter - Voter location { county, constituency, ward }
+ * @returns {Object} - { valid: boolean, error: string }
+ */
+export const validateCandidateJurisdiction = (candidate, voter) => {
+  if (!candidate || !voter) {
+    return { valid: false, error: 'Missing candidate or voter information' };
+  }
+
+  const position = normalizePosition(candidate.position);
+  
+  // President is national - always valid
+  if (position === POSITIONS.PRESIDENT) {
+    return { valid: true, error: null };
+  }
+  
+  // Check jurisdiction based on position
+  switch (position) {
+    case POSITIONS.GOVERNOR:
+    case POSITIONS.SENATOR:
+    case POSITIONS.WOMAN_REPRESENTATIVE:
+      if (!voter.county) {
+        return { valid: false, error: 'Voter county not found' };
+      }
+      // FIX: Use resolveVoterCountyName to handle both numeric county IDs (e.g., 28)
+      // and string county names (e.g., "Nakuru"). The candidate.county is a string
+      // (e.g., "Nakuru") from the blockchain. Both are normalized to lowercase for comparison.
+      const candidateCounty = String(candidate.county || '').toLowerCase().trim();
+      const voterCounty = resolveVoterCountyName(voter.county);
+      if (candidateCounty !== voterCounty) {
+        return { valid: false, error: 'This candidate is outside your registered voting jurisdiction.' };
+      }
+      return { valid: true, error: null };
+      
+    case POSITIONS.MEMBER_OF_PARLIAMENT:
+      if (!voter.constituency) {
+        return { valid: false, error: 'Voter constituency not found' };
+      }
+      if (normalizePosition(candidate.constituency) !== normalizePosition(voter.constituency)) {
+        return { valid: false, error: 'This candidate is outside your registered voting jurisdiction.' };
+      }
+      return { valid: true, error: null };
+      
+    case POSITIONS.MCA:
+      if (!voter.ward) {
+        return { valid: false, error: 'Voter ward not found' };
+      }
+      if (normalizePosition(candidate.ward) !== normalizePosition(voter.ward)) {
+        return { valid: false, error: 'This candidate is outside your registered voting jurisdiction.' };
+      }
+      return { valid: true, error: null };
+      
+    default:
+      return { valid: false, error: 'Unknown position' };
   }
 };
 
@@ -88,15 +253,15 @@ export const saveCandidateProfile = async (candidateData) => {
  */
 export const getCandidateProfileByBlockchainId = async (blockchainId) => {
   try {
-    const querySnapshot = await getDocs(collection(db, CANDIDATE_PROFILES_COLLECTION));
+    const q = query(collection(db, CANDIDATE_PROFILES_COLLECTION), where('blockchainId', '==', blockchainId));
+    const querySnapshot = await getDocs(q);
     let profile = null;
     
     querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.blockchainId === blockchainId) {
+      if (!profile) {
         profile = {
           id: doc.id,
-          ...data
+          ...doc.data()
         };
       }
     });

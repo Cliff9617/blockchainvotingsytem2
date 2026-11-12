@@ -1,13 +1,43 @@
 import React from 'react';
+import usePermissions from '../hooks/usePermissions';
 
+/**
+ * ElectionControls - Election Lifecycle Controls
+ * 
+ * SECURITY: This component is ONLY rendered when the connected wallet
+ * holds the SuperAdmin role (role 8) in the DeVoteNational contract.
+ * 
+ * Uses the centralized usePermissions() hook for permission checks.
+ * If the connected account does NOT have canStartElection permission,
+ * this entire component is hidden (not rendered at all).
+ * 
+ * The backend (useElection hook) also enforces Super Admin authorization
+ * before any blockchain transaction is sent.
+ */
 const ElectionControls = ({ 
   contract, 
+  account,
   electionStarted, 
   electionEnded, 
   isLoading, 
   onStartElection, 
-  onEndElection 
+  onEndElection,
+  isSuperAdmin = false,
+  isSuperAdminVerified = false,
+  userRole = null,
+  userRoleName = '',
 }) => {
+  // Use centralized permission system
+  const { hasPermission, canAccessModule, loading: permLoading } = usePermissions(contract, account);
+
+  // SECURITY: Do NOT render election lifecycle controls if the user lacks permission
+  // Check via centralized permission system: canStartElection is Super Admin only
+  // This is a complete hide - not just disabling buttons
+  const canControlElection = hasPermission('canStartElection') || (isSuperAdmin && isSuperAdminVerified);
+  
+  if (!canControlElection) {
+    return null;
+  }
 
   const handleStartElection = async () => {
     try {
@@ -27,7 +57,15 @@ const ElectionControls = ({
 
   return (
     <div className="bg-white rounded-xl shadow-soft border border-gray-100 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Election Controls</h3>
+      {/* Super Admin Badge */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Election Lifecycle Controls</h3>
+        <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-100 border border-green-300 rounded-full">
+          <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+          <span className="text-xs font-semibold text-green-800">🟢 Super Admin</span>
+        </div>
+      </div>
+      <p className="text-sm text-gray-500 mb-4">Election Lifecycle Authority — Only you can control the election lifecycle.</p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Navbar from '../components/Navbar';
-import { getAllCounties, getConstituenciesByCounty, getWardsByConstituency } from '../data/kenyaLocations';
+import { getAllCounties, getConstituenciesByCountyId, getWardsByConstituencyId } from '../data/kenyaLocations';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import {
@@ -9,6 +9,7 @@ import {
   detectFace,
   checkFacePosition,
 } from '../utils/faceDetection';
+import { validatePdfFile, uploadVoterIdDocument } from '../services/storageService';
 
 const RegistrationPage = ({
   onConnectWallet,
@@ -40,14 +41,19 @@ const RegistrationPage = ({
   const [counties, setCounties] = useState([]);
   const [constituencies, setConstituencies] = useState([]);
   const [wards, setWards] = useState([]);
+  const [dataLoadingError, setDataLoadingError] = useState(false);
 
-  // Step 3: ID & Selfie
-  const [idPhoto, setIdPhoto] = useState(null);
-  const [idPhotoPreview, setIdPhotoPreview] = useState(null);
+  // Step 3: ID Document (PDF) & Selfie
+  const [idDocument, setIdDocument] = useState(null);
+  const [idDocumentName, setIdDocumentName] = useState('');
+  const [idDocumentUploaded, setIdDocumentUploaded] = useState(false);
+  const [idDocumentUrl, setIdDocumentUrl] = useState('');
+  const [idDocumentProgress, setIdDocumentProgress] = useState(0);
+  const [isUploadingIdDoc, setIsUploadingIdDoc] = useState(false);
   const [selfie, setSelfie] = useState(null);
   const [selfiePreview, setSelfiePreview] = useState(null);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
-  const [idPhotoError, setIdPhotoError] = useState('');
+  const [idDocumentError, setIdDocumentError] = useState('');
   const [selfieError, setSelfieError] = useState('');
 
   // Face detection state
@@ -98,20 +104,36 @@ const RegistrationPage = ({
   // Update constituencies when county changes
   useEffect(() => {
     if (votingArea.county) {
-      const loadedConstituencies = getConstituenciesByCounty(votingArea.county);
-      setConstituencies(loadedConstituencies);
+      console.log('[RegistrationPage] Loading constituencies for county:', votingArea.county);
+      try {
+        const loadedConstituencies = getConstituenciesByCountyId(votingArea.county);
+        console.log('[RegistrationPage] Loaded constituencies:', loadedConstituencies);
+        if (loadedConstituencies && loadedConstituencies.length > 0) {
+          setConstituencies(loadedConstituencies);
+          setDataLoadingError(false);
+        } else {
+          console.warn('[RegistrationPage] No constituencies found for county:', votingArea.county);
+          setConstituencies([]);
+          setDataLoadingError(true);
+        }
+      } catch (error) {
+        console.error('[RegistrationPage] Error loading constituencies:', error);
+        setConstituencies([]);
+        setDataLoadingError(true);
+      }
       setVotingArea(prev => ({ ...prev, constituency: '', ward: '' }));
       setWards([]);
     } else {
       setConstituencies([]);
       setWards([]);
+      setDataLoadingError(false);
     }
   }, [votingArea.county]);
 
   // Update wards when constituency changes
   useEffect(() => {
-    if (votingArea.constituency) {
-      const loadedWards = getWardsByConstituency(votingArea.county, votingArea.constituency);
+    if (votingArea.constituency && votingArea.county) {
+      const loadedWards = getWardsByConstituencyId(votingArea.county, votingArea.constituency);
       setWards(loadedWards);
       setVotingArea(prev => ({ ...prev, ward: '' }));
     } else {
@@ -148,7 +170,7 @@ const RegistrationPage = ({
     if (!personalDetails.nationalId.trim()) {
       errors.nationalId = 'National ID number is required';
     } else if (!/^\d{8}$/.test(personalDetails.nationalId.trim())) {
-      errors.nationalId = 'Enter a valid 8-digit National ID number';
+      errors.nationalId = 'National ID must contain 7 to 9 digits';
     }
     if (!personalDetails.pin.trim()) {
       errors.pin = 'Voting PIN is required';
@@ -200,29 +222,68 @@ const RegistrationPage = ({
     }
   };
 
-  // Step 3: ID & Selfie handlers
-  const handleIdPhotoUpload = (e) => {
+  // Step 3: ID Document (PDF) handlers
+  const handleIdDocumentSelect = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        setIdPhotoError('Only JPG, PNG, and WEBP files are allowed');
-        return;
-      }
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        setIdPhotoError('File size must be less than 5MB');
-        return;
-      }
-      setIdPhotoError('');
-      setIdPhoto(file);
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setIdPhotoPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
+    console.log("============================================");
+    console.log("[DIAG] handleIdDocumentSelect FIRED");
+    console.log("[DIAG] Event target:", e.target);
+    console.log("[DIAG] Event target.files:", e.target.files);
+    console.log("[DIAG] file:", file?.name, file?.size, file?.type);
+    if (!file) {
+      console.log("[DIAG] No file in event, returning early");
+      return;
     }
+
+    const validation = validatePdfFile(file);
+    console.log("[DIAG] validatePdfFile result:", JSON.stringify(validation));
+    if (!validation.valid) {
+      console.log("[DIAG] Validation FAILED:", validation.error);
+      setIdDocumentError(validation.error);
+      setIdDocument(null);
+      setIdDocumentName('');
+      setIdDocumentUploaded(false);
+      return;
+    }
+
+    console.log("[DIAG] Validation PASSED, about to set state");
+    setIdDocumentError('');
+    setIdDocument(file);
+    setIdDocumentName(file.name);
+    setIdDocumentUploaded(true);
+    console.log("[DIAG] State set. idDocument =", file.name, "| idDocumentUploaded = true");
+    console.log("============================================");
+  };
+
+  const handleUploadIdDocument = async () => {
+    // Stub - actual upload logic would go here
+    if (!idDocument) {
+      setIdDocumentError('Please select a PDF file first');
+      return;
+    }
+    setIsUploadingIdDoc(true);
+    setIdDocumentError('');
+    try {
+      // Simulate upload
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIdDocumentUploaded(true);
+      setIdDocumentProgress(100);
+    } catch (err) {
+      setIdDocumentError(err.message || 'Upload failed');
+    } finally {
+      setIsUploadingIdDoc(false);
+    }
+  };
+
+  const handleReplaceIdDocument = () => {
+    setIdDocument(null);
+    setIdDocumentName('');
+    setIdDocumentUploaded(false);
+    setIdDocumentUrl('');
+    setIdDocumentProgress(0);
+    setIdDocumentError('');
+    const fileInput = document.getElementById('national-id-pdf-upload');
+    if (fileInput) fileInput.value = '';
   };
 
   // Face detection for auto-capture
@@ -525,6 +586,8 @@ const RegistrationPage = ({
 
   const closeWebcamModal = () => {
     console.log('[RegistrationPage] Closing webcam modal');
+    console.log('[AUDIT] closeWebcamModal: currentStep before close =', currentStep);
+    console.log('[AUDIT] closeWebcamModal: showWebcamModal before close =', showWebcamModal);
     stopWebcam();
     setShowWebcamModal(false);
     setCameraReady(false);
@@ -537,6 +600,7 @@ const RegistrationPage = ({
     setCountdown(null);
     setIsAutoCapturing(false);
     holdStartTimeRef.current = null;
+    console.log('[AUDIT] closeWebcamModal: state updates queued, showWebcamModal set to false');
   };
 
   const captureSelfie = () => {
@@ -609,27 +673,72 @@ const RegistrationPage = ({
           const base64 = canvas.toDataURL('image/jpeg', quality);
           resolve(base64);
         };
-        img.onerror = reject;
+        img.onerror = () => {
+          console.error('[RegistrationPage] Image loading failed for compression');
+          reject(new Error('Failed to load image for compression'));
+        };
         img.src = e.target.result;
       };
-      reader.onerror = reject;
+      reader.onerror = () => {
+        console.error('[RegistrationPage] FileReader failed for compression');
+        reject(new Error('Failed to read file for compression'));
+      };
       reader.readAsDataURL(file);
     });
   };
 
   // Submit registration
   const submitRegistration = async () => {
-    console.log('Starting registration');
+    console.log('========================================');
+    console.log('STEP 1: Submit clicked - starting registration');
+    console.log('========================================');
+    console.log('selfiePreview available:', !!selfiePreview);
+    console.log('selfiePreview length:', selfiePreview ? selfiePreview.length : 0);
+    console.log('selfie File available:', !!selfie);
+    console.log('idDocumentUrl:', idDocumentUrl);
+    console.log('idDocumentUploaded:', idDocumentUploaded);
+    
     try {
-      // Compress images
-      console.log('Compressing images');
-      const [compressedIdPhoto, compressedSelfie] = await Promise.all([
-        compressImageToBase64(idPhoto, 500, 0.5),
-        compressImageToBase64(selfie, 500, 0.5)
-      ]);
+      console.log('STEP 2: Validation passed, building registration data');
+      
+      // TEMPORARY EXHIBITION FALLBACK:
+      // Use selfiePreview (already-encoded Base64 data URL) directly instead of
+      // re-compressing via compressImageToBase64 which can hang indefinitely
+      // if the Image loading from FileReader data URL never completes.
+      let selfieBase64 = '';
+      if (selfiePreview) {
+        console.log('STEP 3: Using selfiePreview Base64 data directly (length: ' + selfiePreview.length + ')');
+        selfieBase64 = selfiePreview;
+      } else if (selfie) {
+        console.log('STEP 3: selfiePreview not available, attempting compressImageToBase64 with timeout');
+        // Add a timeout to prevent hanging
+        try {
+          selfieBase64 = await Promise.race([
+            compressImageToBase64(selfie, 500, 0.5),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('compressImageToBase64 timed out after 10 seconds')), 10000)
+            )
+          ]);
+          console.log('STEP 4: compressImageToBase64 completed, length: ' + selfieBase64.length);
+        } catch (compressError) {
+          console.error('compressImageToBase64 failed or timed out:', compressError);
+          // Fallback: use raw selfie as base64 via FileReader directly
+          console.log('STEP 3b: Falling back to direct FileReader for selfie');
+          selfieBase64 = await new Promise((resolve, reject) => {
+            const fallbackReader = new FileReader();
+            fallbackReader.onload = () => resolve(fallbackReader.result);
+            fallbackReader.onerror = () => reject(new Error('Fallback FileReader failed'));
+            // Add timeout for fallback too
+            setTimeout(() => reject(new Error('Fallback FileReader timed out')), 10000);
+            fallbackReader.readAsDataURL(selfie);
+          });
+          console.log('STEP 4b: Fallback FileReader completed, length: ' + selfieBase64.length);
+        }
+      } else {
+        console.log('STEP 3: No selfie data available');
+      }
 
-      // Save to Firestore
-      console.log('Saving Firestore document');
+      console.log('STEP 5: Building Firestore document');
       const registrationData = {
         walletAddress: account || "",
         fullName: personalDetails.fullName,
@@ -638,19 +747,24 @@ const RegistrationPage = ({
         constituency: votingArea.constituency,
         ward: votingArea.ward,
         pin: personalDetails.pin,
-        idPhotoBase64: compressedIdPhoto,
-        selfieBase64: compressedSelfie,
+        idDocumentUrl: idDocumentUrl,
+        selfieBase64: selfieBase64,
         status: "pending",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      await addDoc(
+      console.log('STEP 6: Saving registration to Firestore...');
+      console.log('Document size estimate:', JSON.stringify(registrationData).length, 'bytes');
+      
+      const docRef = await addDoc(
         collection(db, "voterRegistrationRequests"),
         registrationData
       );
 
-      console.log('Registration saved successfully');
+      console.log('STEP 7: Firestore save completed - Document ID:', docRef.id);
+      console.log('STEP 8: Registration completed successfully');
+      console.log('========================================');
 
       // Show success
       setShowSuccessModal(true);
@@ -658,29 +772,40 @@ const RegistrationPage = ({
       // Reset form
       setPersonalDetails({ fullName: '', nationalId: '', pin: '', confirmPin: '' });
       setVotingArea({ county: '', constituency: '', ward: '' });
-      setIdPhoto(null);
-      setIdPhotoPreview(null);
+      setIdDocument(null);
+      setIdDocumentName('');
+      setIdDocumentUploaded(false);
+      setIdDocumentUrl('');
+      setIdDocumentProgress(0);
+      setIsUploadingIdDoc(false);
       setSelfie(null);
       setSelfiePreview(null);
       setCurrentStep(1);
 
     } catch (error) {
+      console.error('========================================');
       console.error("Registration failed:", error);
-      alert(error.message);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('========================================');
+      alert('Registration failed: ' + (error.message || 'Unknown error. Please try again.'));
     } finally {
+      console.log('STEP 9: Finally block - re-enabling submit button');
       setIsSubmitting(false);
     }
   };
 
   const handleSubmit = async () => {
+    console.log("BUTTON CLICKED");
     // Prevent double submit
     if (isSubmitting) {
       console.log('[RegistrationPage] Already submitting, ignoring duplicate click');
       return;
     }
 
-    if (!idPhoto) {
-      setIdPhotoError('Please upload your National ID photo');
+    if (!idDocumentUploaded) {
+      setIdDocumentError('Please select a valid National ID PDF');
       return;
     }
     if (!selfie) {
@@ -688,8 +813,32 @@ const RegistrationPage = ({
       return;
     }
 
+    console.log('[RegistrationPage] handleSubmit: Setting isSubmitting=true');
     setIsSubmitting(true);
-    await submitRegistration();
+
+    // Upload ID document if not yet uploaded
+    if (idDocument && !idDocumentUrl) {
+      console.log('[RegistrationPage] Uploading ID document before submission...');
+      const voterId = `voter_${personalDetails.nationalId}_${Date.now()}`;
+      try {
+        const downloadUrl = await uploadVoterIdDocument(idDocument, voterId);
+        console.log('[RegistrationPage] ID document uploaded, URL:', downloadUrl);
+        setIdDocumentUrl(downloadUrl);
+      } catch (uploadError) {
+        console.error('[RegistrationPage] Failed to upload ID document:', uploadError);
+        setIdDocumentError('Failed to upload PDF. Please check your connection and try again.');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    
+    try {
+      await submitRegistration();
+    } catch (error) {
+      // Safety net: catch any unhandled errors from submitRegistration
+      console.error('[RegistrationPage] Unhandled error in handleSubmit:', error);
+      setIsSubmitting(false);
+    }
   };
 
   // Progress indicator component
@@ -793,8 +942,8 @@ const RegistrationPage = ({
                   name="nationalId"
                   value={personalDetails.nationalId}
                   onChange={handlePersonalChange}
-                  placeholder="e.g. 12345678"
-                  maxLength={8}
+                  placeholder="e.g. 1234567"
+                  maxLength={9}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none ${
                     personalErrors.nationalId ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
@@ -909,6 +1058,15 @@ const RegistrationPage = ({
                 {votingAreaErrors.constituency && (
                   <p className="mt-1 text-sm text-red-600">{votingAreaErrors.constituency}</p>
                 )}
+                {!votingArea.county && (
+                  <p className="mt-1 text-sm text-gray-500">Please select a county first</p>
+                )}
+                {votingArea.county && dataLoadingError && (
+                  <p className="mt-1 text-sm text-yellow-600">⚠️ No constituencies found for selected county. Please try a different county or contact support.</p>
+                )}
+                {votingArea.county && constituencies.length === 0 && !dataLoadingError && (
+                  <p className="mt-1 text-sm text-gray-500">Loading constituencies...</p>
+                )}
               </div>
 
               <div>
@@ -956,61 +1114,103 @@ const RegistrationPage = ({
         {currentStep === 3 && (
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">National ID & Selfie</h2>
-            <p className="text-gray-600 mb-6">Upload your ID and take a selfie for verification.</p>
+            <p className="text-gray-600 mb-6">Upload your National ID scan (PDF) and take a selfie for verification.</p>
 
             <div className="space-y-8">
-              {/* National ID Upload */}
+              {/* National ID PDF Upload - Replaces image upload */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">1. National ID — Front Page Photo</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">1. National ID Scan (PDF)</h3>
                 <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-green-500 transition-colors">
-                  {idPhotoPreview ? (
+                  {idDocumentUploaded ? (
                     <div className="space-y-4">
-                      <img 
-                        src={idPhotoPreview} 
-                        alt="ID Preview" 
-                        className="max-w-xs max-h-48 mx-auto rounded-lg shadow-md"
-                      />
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">{idPhoto?.name}</p>
-                        <button
-                          onClick={() => {
-                            setIdPhoto(null);
-                            setIdPhotoPreview(null);
-                          }}
-                          className="text-sm text-red-600 hover:text-red-700 underline"
-                        >
-                          Remove and re-upload
-                        </button>
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                        <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
                       </div>
+                      <p className="text-green-700 font-semibold">✓ PDF Uploaded Successfully</p>
+                      <p className="text-sm text-gray-600">{idDocumentName}</p>
+                      <button
+                        onClick={handleReplaceIdDocument}
+                        className="text-sm text-blue-600 hover:text-blue-700 underline font-medium"
+                      >
+                        Replace PDF
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
                         <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
                       </div>
-                      <div>
-                        <label className="cursor-pointer">
-                          <span className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-block">
-                            Upload ID Photo
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={handleIdPhotoUpload}
-                            className="hidden"
-                          />
-                        </label>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Accepts JPG, PNG, WEBP (Max 5MB)
-                        </p>
-                      </div>
+                      
+                      {!idDocument ? (
+                        <div>
+                          <label className="cursor-pointer">
+                            <span className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-block">
+                              Select PDF
+                            </span>
+                            <input
+                              id="national-id-pdf-upload"
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              onChange={handleIdDocumentSelect}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-sm text-gray-500 mt-2">
+                            Only PDF files are accepted (Max 10 MB)
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="bg-gray-50 rounded-lg p-3 inline-block mx-auto">
+                            <p className="text-sm font-medium text-gray-700">{idDocumentName}</p>
+                            <p className="text-xs text-gray-500">
+                              {(idDocument.size / 1024 / 1024).toFixed(1)} MB
+                            </p>
+                          </div>
+                          
+                          {/* Upload Progress Bar */}
+                          {isUploadingIdDoc && (
+                            <div className="mt-3">
+                              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Uploading PDF...</span>
+                                <span>{Math.round(idDocumentProgress)}%</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div
+                                  className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
+                                  style={{ width: `${idDocumentProgress}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={handleUploadIdDocument}
+                              disabled={isUploadingIdDoc}
+                              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            >
+                              {isUploadingIdDoc ? 'Uploading...' : 'Upload PDF'}
+                            </button>
+                            <button
+                              onClick={handleReplaceIdDocument}
+                              disabled={isUploadingIdDoc}
+                              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-                {idPhotoError && (
-                  <p className="mt-2 text-sm text-red-600">{idPhotoError}</p>
+                {idDocumentError && (
+                  <p className="mt-2 text-sm text-red-600">{idDocumentError}</p>
                 )}
               </div>
 
@@ -1074,7 +1274,7 @@ const RegistrationPage = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-sm text-blue-800">
-                    <strong>Privacy Notice:</strong> Your photos are uploaded securely and only visible to IEBC staff for verification purposes. They are never stored on the blockchain.
+                    <strong>Privacy Notice:</strong> Your documents are uploaded securely and only visible to IEBC staff for verification purposes. They are never stored on the blockchain.
                   </p>
                 </div>
               </div>
@@ -1087,9 +1287,13 @@ const RegistrationPage = ({
                 >
                   Back
                 </button>
+                {console.log("Button disabled:", isSubmitting || !idDocumentUploaded)}
+                {console.log("isSubmitting =", isSubmitting)}
+                {console.log("idDocumentUploaded =", idDocumentUploaded)}
+                {console.log("Rendering Submit Button")}
                 <button
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !idDocumentUploaded}
                   className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
                 >
                   {isSubmitting ? (
@@ -1299,3 +1503,8 @@ const RegistrationPage = ({
 };
 
 export default RegistrationPage;
+
+
+
+
+

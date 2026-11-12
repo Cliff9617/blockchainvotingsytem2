@@ -1,5 +1,6 @@
 import React from "react";
 import { getPositionDisplayName, getWinnerAreaDescription } from "../utils/electionFilters";
+import { getCandidateImage } from "../utils/getCandidateImage";
 
 const CandidateCard = ({
   candidate,
@@ -28,7 +29,8 @@ const CandidateCard = ({
   const position = candidate?.position;
   const pollingCenterName = candidate?.pollingCenterName;
   const pollingStationName = candidate?.pollingStationName;
-  const imageUrl = candidate?.imageUrl;
+  const candidateImage = getCandidateImage(candidate);
+  const hasImage = candidate?.candidatePhoto || candidate?.imageData || candidate?.imageUrl;
 
   const percentage =
     typeof getVotePercentage === "function"
@@ -133,9 +135,9 @@ const CandidateCard = ({
     <div className={getCardClasses()}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
-          {imageUrl ? (
+          {candidateImage && !candidateImage.includes('placeholder') ? (
             <img
-              src={imageUrl}
+              src={candidateImage}
               alt={candidateName}
               className="w-14 h-14 rounded-full object-cover shadow-xl transition-all duration-300"
             />
@@ -214,37 +216,37 @@ const CandidateCard = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
             {positionDisplay && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">🏛️</span>
+                <span className="text-gray-400"></span>
                 <span>Position: {positionDisplay}</span>
               </div>
             )}
             {county && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">📍</span>
+                <span className="text-gray-400"></span>
                 <span>County: {county}</span>
               </div>
             )}
             {constituency && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">🏛️</span>
+                <span className="text-gray-400"></span>
                 <span>Constituency: {constituency}</span>
               </div>
             )}
             {ward && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">📍</span>
+                <span className="text-gray-400"></span>
                 <span>Ward: {ward}</span>
               </div>
             )}
             {pollingCenterName && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">🏢</span>
+                <span className="text-gray-400"></span>
                 <span>Center: {pollingCenterName}</span>
               </div>
             )}
             {pollingStationName && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">🗳️</span>
+                <span className="text-gray-400"></span>
                 <span>Station: {pollingStationName}</span>
               </div>
             )}
