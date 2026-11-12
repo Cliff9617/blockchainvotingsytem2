@@ -236,11 +236,21 @@ const useElection = (contract, account, isSuperAdmin) => {
 
       try {
         // Use registeredVoters() to check if voter is registered
-        const isRegistered = await contract.registeredVoters(account);
-        
-        // Use getPositionVotingStatus() to get position-based voting status
-        const votingStatus = await contract.getPositionVotingStatus(account);
-        
+        let isRegistered;
+        let votingStatus;
+        try {
+          isRegistered = await contract.registeredVoters(account);
+          // Use getPositionVotingStatus() to get position-based voting status
+          votingStatus = await contract.getPositionVotingStatus(account);
+        } catch (firstErr) {
+          // Transient RPC failures must never permanently lock a voter out of
+          // results - one retry before giving up.
+          console.warn('[useElection] Voter status read failed once, retrying:', firstErr?.message);
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          isRegistered = await contract.registeredVoters(account);
+          votingStatus = await contract.getPositionVotingStatus(account);
+        }
+
         console.log('[useElection] Voter info from contract:', { isRegistered, votingStatus });
 
         const hasVotedAll = Boolean(

@@ -371,7 +371,7 @@ const VotePage = ({
         isConnected={isConnected}
         account={account}
         onNavigate={onNavigate}
-        resultsLocked={!hasVoted && !electionEnded && !isAdmin}
+        resultsLocked={!(voterInfo?.hasVotedAny || hasVoted) && !electionEnded && !isAdmin}
       />
 
       {/* ===== SMILE ID IDENTITY VERIFICATION GATE ===== */}

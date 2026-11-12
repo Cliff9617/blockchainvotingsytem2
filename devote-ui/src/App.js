@@ -10,6 +10,7 @@ import VotePage from "./pages/VotePage";
 import ResultsPage from "./pages/ResultsPage";
 import VerifyVotePage from "./pages/VerifyVotePage";
 import NationalResultsCenter from "./components/NationalResultsCenter";
+import { getRegistrationByWallet } from "./services/registrationService";
 import useContract from "./hooks/useContract";
 import useElection from "./hooks/useElection";
 import usePermissions from "./hooks/usePermissions";
@@ -120,6 +121,59 @@ function App() {
 
   // Voter location data for area-based filtering
   const [voterLocation, setVoterLocation] = useState(null);
+
+  // Restore voter area for returning voters ("applied before").
+  // Previously this was only populated after a fresh sign-in on the Vote page,
+  // so earlier applicants who returned to the site only ever saw national
+  // (presidential) results. Restoring from their approved registration record
+  // gives every approved voter - old and new - the same area-filtered results.
+  useEffect(() => {
+    let cancelled = false;
+    const restoreVoterArea = async () => {
+      if (!account) {
+        setVoterLocation(null);
+        return;
+      }
+      try {
+        const registration = await getRegistrationByWallet(account);
+        if (cancelled) return;
+        const isApproved =
+          registration &&
+          (registration.status === 'approved' ||
+            registration.status === 'Approved' ||
+            registration.status === 'APPROVED');
+        if (isApproved && (registration.county || registration.constituency || registration.ward)) {
+          setVoterLocation({
+            fullName: registration.fullName || 'Citizen Voter',
+            county: registration.county,
+            constituency: registration.constituency,
+            ward: registration.ward,
+          });
+        } else if (isApproved) {
+          // Approved voter with no area data on file - national view still works
+          setVoterLocation(null);
+        }
+      } catch (err) {
+        console.warn('[App] Could not restore voter area profile:', err?.message);
+      }
+    };
+    restoreVoterArea();
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
+
+  // Re-run the on-chain ballot-status check for the connected wallet.
+  // Used by the ResultsGate "I already voted" button - covers stale state,
+  // transient RPC failures, and voters who voted in an earlier session.
+  const handleRecheckVoterStatus = useCallback(async () => {
+    if (!checkVoterInfo || !account) return;
+    try {
+      await checkVoterInfo(account);
+    } catch (err) {
+      console.warn('[App] Ballot status re-check failed:', err?.message);
+    }
+  }, [checkVoterInfo, account]);
 
   // Registration status from Firestore/localStorage
   const [registrationStatus, setRegistrationStatus] = useState(null);
@@ -480,12 +534,26 @@ function App() {
         return <VotePage {...votePageProps} />;
       case 'results':
         if (!canViewResults) {
-          return <ResultsGate onNavigateToVote={() => handleNavigate('vote')} />;
+          return (
+            <ResultsGate
+              onNavigateToVote={() => handleNavigate('vote')}
+              onRecheckVoterStatus={handleRecheckVoterStatus}
+              voterInfo={voterInfo}
+              isConnected={isConnected}
+            />
+          );
         }
         return <ResultsPage {...resultsPageProps} />;
       case 'national-results':
         if (!canViewResults) {
-          return <ResultsGate onNavigateToVote={() => handleNavigate('vote')} />;
+          return (
+            <ResultsGate
+              onNavigateToVote={() => handleNavigate('vote')}
+              onRecheckVoterStatus={handleRecheckVoterStatus}
+              voterInfo={voterInfo}
+              isConnected={isConnected}
+            />
+          );
         }
         return <NationalResultsCenter {...nationalResultsProps} />;
       case 'admin':
