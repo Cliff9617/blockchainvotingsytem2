@@ -65,6 +65,29 @@ const readFileAsText = (file) =>
     reader.readAsText(file);
   });
 
+// ---------------------------------------------------------------------------
+// Performance: candidate profiles are effectively immutable during an election.
+// Cache them (they carry base64 photos - re-downloading them on every refresh
+// costs MBs of transfer and decode time). Invalidated whenever a candidate is
+// added or a profile changes.
+// ---------------------------------------------------------------------------
+let cachedCandidateProfiles = null;
+let cachedCandidateProfilesAt = 0;
+const CANDIDATE_PROFILE_TTL_MS = 60000;
+
+const getCachedCandidateProfiles = async () => {
+  if (
+    cachedCandidateProfiles &&
+    Date.now() - cachedCandidateProfilesAt < CANDIDATE_PROFILE_TTL_MS
+  ) {
+    return cachedCandidateProfiles;
+  }
+  const profiles = await getAllCandidateProfiles();
+  cachedCandidateProfiles = profiles;
+  cachedCandidateProfilesAt = Date.now();
+  return profiles;
+};
+
 const useElection = (contract, account, isSuperAdmin) => {
   const [candidates, setCandidates] = useState([]);
   // Use false as initial state instead of null for consistent boolean checks
@@ -105,30 +128,63 @@ const useElection = (contract, account, isSuperAdmin) => {
     });
   };
 
+  // Perf: coalesce concurrent reloads and throttle bursts so the post-vote
+  // reload and the on-chain VoteCast listener never do the same work twice.
+  const loadElectionDataInFlight = useRef(null);
+  const lastLoadElectionDataAt = useRef(0);
+  const ELECTION_RELOAD_THROTTLE_MS = 1000;
+
   const loadElectionData = useCallback(async () => {
     if (!contract) return;
 
-    setIsLoading(true);
-    setError("");
+    // Join an already-running reload instead of starting a duplicate one
+    if (loadElectionDataInFlight.current) {
+      return loadElectionDataInFlight.current;
+    }
+    // Skip bursts (e.g. the VoteCast event firing right after our own
+    // post-transaction reload already refreshed the data)
+    if (Date.now() - lastLoadElectionDataAt.current < ELECTION_RELOAD_THROTTLE_MS) {
+      return;
+    }
 
-    try {
-      // ============================================================================
-      // STARTUP DIAGNOSTIC: Log blockchain candidates count in the exact format
-      // requested for auditing. This runs on every loadElectionData() call which
-      // is triggered on application startup (when contract becomes available).
-      // ============================================================================
-      const rawCandidatesCount = await contract.candidatesCount();
-      console.log("Blockchain candidates:", rawCandidatesCount);
+    const run = (async () => {
+      setIsLoading(true);
+      setError("");
 
-      const count = Number(rawCandidatesCount);
-      const blockchainCandidates = [];
+      try {
+        // ------------------------------------------------------------------
+        // Count, election state and candidate profiles are read CONCURRENTLY
+        // (they used to be sequential: count -> N candidates -> 2 state calls
+        //  -> full Firestore collection read = N+5 serial round trips).
+        // ------------------------------------------------------------------
+        const [rawCandidatesCount, [started, ended], profiles] = await Promise.all([
+          contract.candidatesCount(),
+          Promise.all([contract.electionStarted(), contract.electionEnded()]),
+          getCachedCandidateProfiles(),
+        ]);
 
-      console.log('[useElection] Loading candidates from blockchain, count:', count);
+        console.log("Blockchain candidates:", rawCandidatesCount);
 
-      for (let i = 1; i <= count; i += 1) {
-        try {
-          const candidate = await contract.candidates(i);
-          console.log('[useElection] Candidate', i, ':', {
+        const count = Number(rawCandidatesCount);
+        console.log('[useElection] Loading candidates from blockchain, count:', count);
+
+        // ------------------------------------------------------------------
+        // Candidate reads are PARALLEL (was a sequential for-loop with N
+        // awaits). Per-item error isolation is preserved.
+        // ------------------------------------------------------------------
+        const candidateRows = await Promise.all(
+          Array.from({ length: count }, (_, i) =>
+            contract.candidates(i + 1).catch((err) => {
+              console.error('[useElection] Error loading candidate', i + 1, ':', err);
+              return null;
+            })
+          )
+        );
+
+        const blockchainCandidates = [];
+        candidateRows.forEach((candidate, i) => {
+          if (!candidate) return;
+          console.log('[useElection] Candidate', i + 1, ':', {
             id: Number(candidate.id),
             name: candidate.name,
             voteCount: Number(candidate.voteCount),
@@ -137,7 +193,7 @@ const useElection = (contract, account, isSuperAdmin) => {
             constituency: candidate.constituency || '',
             ward: candidate.ward || '',
           });
-          
+
           blockchainCandidates.push({
             id: Number(candidate.id),
             name: candidate.name,
@@ -148,82 +204,58 @@ const useElection = (contract, account, isSuperAdmin) => {
             constituency: candidate.constituency || '',
             ward: candidate.ward || '',
           });
-        } catch (err) {
-          console.error('[useElection] Error loading candidate', i, ':', err);
-        }
-      }
+        });
 
-      // DIAGNOSTIC LOGGING: Read election state directly from blockchain
-      console.log('[useElection] ===== DIAGNOSTIC: Reading blockchain state =====');
-      
-      const [started, ended] = await Promise.all([
-        contract.electionStarted(),
-        contract.electionEnded(),
-      ]);
-      
-      console.log('[useElection]  electionStarted():', started);
-      console.log('[useElection]  electionEnded():', ended);
-      
-      // Read owner and role info for diagnostic
-      try {
-        const owner = await contract.owner();
-        console.log('[useElection]  owner():', owner);
-      } catch (e) {
-        console.log('[useElection]  Could not read owner():', e.message);
-      }
-      
-      // Admin detection is handled by useAdmin hook (called from App.js)
-      // This hook does not have access to the connected account,
-      // so we cannot call getUserRole here.
-      // The admin state is only used for display in AdminPanel,
-      // which receives the actual adminAddress from useAdmin via props.
-      let adminAddress = null;
-      console.log('[useElection] Admin detection delegated to useAdmin hook');
+        console.log('[useElection] Election state:', { started, ended });
 
-      console.log('[useElection] Election state:', { started, ended, adminAddress });
+        // Load Firebase candidate profiles (cached - see getCachedCandidateProfiles)
+        console.log('[useElection] Loaded', profiles.length, 'candidate profiles from Firebase');
+        setCandidateProfiles(profiles);
 
-      // Load Firebase candidate profiles
-      const profiles = await getAllCandidateProfiles();
-      console.log('[useElection] Loaded', profiles.length, 'candidate profiles from Firebase');
-      setCandidateProfiles(profiles);
+        // Merge blockchain candidates with Firebase profiles
+        let presCounter = 1;
+        const mergedCandidates = blockchainCandidates.map(blockchainCandidate => {
+          const profile = profiles.find(p => p.blockchainId === blockchainCandidate.id.toString());
+          const resolvedPosition = blockchainCandidate.position || profile?.position || normalizePosition(profile?.position);
+          const isPresident = normalizePosition(resolvedPosition) === POSITIONS.PRESIDENT;
+          
+          let candidateName = profile?.name || blockchainCandidate.name;
+          if (isPresident) {
+            candidateName = `Candidate ${presCounter++}`;
+          }
 
-      // Merge blockchain candidates with Firebase profiles
-      let presCounter = 1;
-      const mergedCandidates = blockchainCandidates.map(blockchainCandidate => {
-        const profile = profiles.find(p => p.blockchainId === blockchainCandidate.id.toString());
-        const resolvedPosition = blockchainCandidate.position || profile?.position || normalizePosition(profile?.position);
-        const isPresident = normalizePosition(resolvedPosition) === POSITIONS.PRESIDENT;
+          const merged = {
+            ...blockchainCandidate,
+            // Firebase profile fields override blockchain fields
+            ...profile,
+            name: candidateName,
+            blockchainId: blockchainCandidate.id.toString(),
+            // Ensure position is set correctly
+            position: resolvedPosition,
+            positionIndex: blockchainCandidate.positionIndex ?? getPositionIndex(profile?.position),
+          };
+          return merged;
+        });
+
+        setCandidates(mergedCandidates);
+        setElectionStarted(Boolean(started));
+        setElectionEnded(Boolean(ended));
         
-        let candidateName = profile?.name || blockchainCandidate.name;
-        if (isPresident) {
-          candidateName = `Candidate ${presCounter++}`;
-        }
+        console.log('[useElection] Final candidates:', mergedCandidates.length);
+      } catch (err) {
+        console.error("loadElectionData error:", err);
+        setError(getReadableError(err, "Failed to load election data"));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
 
-        const merged = {
-          ...blockchainCandidate,
-          // Firebase profile fields override blockchain fields
-          ...profile,
-          name: candidateName,
-          blockchainId: blockchainCandidate.id.toString(),
-          // Ensure position is set correctly
-          position: resolvedPosition,
-          positionIndex: blockchainCandidate.positionIndex ?? getPositionIndex(profile?.position),
-        };
-        console.log('[useElection] Merged candidate:', merged.id, merged.name, 'position:', merged.position);
-        return merged;
-      });
-
-      setCandidates(mergedCandidates);
-      setElectionStarted(Boolean(started));
-      setElectionEnded(Boolean(ended));
-      setAdmin(adminAddress);
-      
-      console.log('[useElection] Final candidates:', mergedCandidates.length);
-    } catch (err) {
-      console.error("loadElectionData error:", err);
-      setError(getReadableError(err, "Failed to load election data"));
+    loadElectionDataInFlight.current = run;
+    try {
+      await run;
     } finally {
-      setIsLoading(false);
+      loadElectionDataInFlight.current = null;
+      lastLoadElectionDataAt.current = Date.now();
     }
   }, [contract]);
 
@@ -239,16 +271,20 @@ const useElection = (contract, account, isSuperAdmin) => {
         let isRegistered;
         let votingStatus;
         try {
-          isRegistered = await contract.registeredVoters(account);
-          // Use getPositionVotingStatus() to get position-based voting status
-          votingStatus = await contract.getPositionVotingStatus(account);
+          // Read both in parallel (they are independent eth_calls)
+          [isRegistered, votingStatus] = await Promise.all([
+            contract.registeredVoters(account),
+            contract.getPositionVotingStatus(account),
+          ]);
         } catch (firstErr) {
           // Transient RPC failures must never permanently lock a voter out of
           // results - one retry before giving up.
           console.warn('[useElection] Voter status read failed once, retrying:', firstErr?.message);
-          await new Promise((resolve) => setTimeout(resolve, 800));
-          isRegistered = await contract.registeredVoters(account);
-          votingStatus = await contract.getPositionVotingStatus(account);
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          [isRegistered, votingStatus] = await Promise.all([
+            contract.registeredVoters(account),
+            contract.getPositionVotingStatus(account),
+          ]);
         }
 
         console.log('[useElection] Voter info from contract:', { isRegistered, votingStatus });
@@ -324,7 +360,7 @@ const useElection = (contract, account, isSuperAdmin) => {
           }
         }
 
-        return { success: true };
+        return { success: true, hash: tx?.hash, blockNumber: receipt?.blockNumber };
       } catch (err) {
         const message = getReadableError(err, fallbackError);
         setError(message);
@@ -413,6 +449,9 @@ const useElection = (contract, account, isSuperAdmin) => {
             createdAt: new Date().toISOString()
           });
           console.log('[useElection] Firebase profile saved with doc ID:', firebaseDocId);
+          // Invalidate the profile cache so the new candidate appears immediately
+          cachedCandidateProfiles = null;
+          cachedCandidateProfilesAt = 0;
         }
 
         // Reload data to include the new candidate
@@ -815,44 +854,45 @@ const useElection = (contract, account, isSuperAdmin) => {
       // Feature 9: Record audit log after successful vote
       // Feature 10: Generate vote receipt for verification
       if (result && candidate) {
-        try {
-          let txHash = '';
-          if (typeof result === 'object' && result.hash) {
-            txHash = result.hash;
-          } else if (typeof result === 'string') {
-            txHash = result;
-          }
-          
-          const position = candidate.position || '';
-          
-          // Record audit log (existing)
-          await recordVoteAudit({
-            position: normalizePosition(position),
-            county: voterLocation?.county || '',
-            constituency: voterLocation?.constituency || '',
-            ward: voterLocation?.ward || '',
-            candidateName: candidate.name || '',
-            candidateId: String(candidateId),
-            walletAddress: account || '',
-            transactionHash: txHash,
-            network: 'Sepolia',
-          });
+        const txHash =
+          (typeof result === 'object' && result.hash) ||
+          (typeof result === 'string' ? result : '') ||
+          '';
+        const position = candidate.position || '';
 
-          // Create vote receipt for verification (new)
-          await createVoteReceipt({
-            transactionHash: txHash,
-            blockNumber: result.blockNumber || 0,
-            timestamp: new Date().toISOString(),
-            electionId: '1',
-            electionName: 'General Election 2026',
-            constituency: voterLocation?.constituency || 'Nairobi',
-            pollingStation: voterLocation?.ward || 'Central',
-            walletAddress: account || '',
-          });
-        } catch (auditError) {
-          // Non-critical - don't fail the vote if audit fails
-          console.warn('[useElection] Audit/receipt recording warning:', auditError);
-        }
+        // Off the critical path: the receipt and audit-log writes must not
+        // delay the next ballot. They already swallow their own errors.
+        void (async () => {
+          try {
+            // Record audit log (existing)
+            await recordVoteAudit({
+              position: normalizePosition(position),
+              county: voterLocation?.county || '',
+              constituency: voterLocation?.constituency || '',
+              ward: voterLocation?.ward || '',
+              candidateName: candidate.name || '',
+              candidateId: String(candidateId),
+              walletAddress: account || '',
+              transactionHash: txHash,
+              network: 'Sepolia',
+            });
+
+            // Create vote receipt for verification (new)
+            await createVoteReceipt({
+              transactionHash: txHash,
+              blockNumber: result.blockNumber || 0,
+              timestamp: new Date().toISOString(),
+              electionId: '1',
+              electionName: 'General Election 2026',
+              constituency: voterLocation?.constituency || 'Nairobi',
+              pollingStation: voterLocation?.ward || 'Central',
+              walletAddress: account || '',
+            });
+          } catch (auditError) {
+            // Non-critical - don't fail the vote if audit fails
+            console.warn('[useElection] Audit/receipt recording warning:', auditError);
+          }
+        })();
       }
       
       return result;

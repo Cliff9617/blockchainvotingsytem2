@@ -78,7 +78,12 @@ const useContract = () => {
       throw new Error("No account selected");
     }
 
-    const provider = new ethers.BrowserProvider(window.ethereum);
+    const provider = new ethers.BrowserProvider(window.ethereum, undefined, {
+      // Ethers defaults to a 4000ms polling interval - that adds up to 4s of
+      // dead wait after every transaction before tx.wait() resolves and events
+      // (VoteCast) are delivered. 1000ms keeps confirmation snappy.
+      pollingInterval: 1000,
+    });
     const signer = await provider.getSigner(selectedAccount);
     const signerAddress = await signer.getAddress();
 

@@ -20,6 +20,7 @@ import {
   BarChartIcon,
 } from "./common/Icons";
 import { downloadReceiptPDF } from "../utils/pdfReceiptGenerator";
+import { findReceiptsByWallet } from "../services/voteReceiptService";
 
 /**
  * 6 Constitutional Ballots in Kenya General Election
@@ -292,6 +293,18 @@ const SimpleVotingInterface = ({
   const handleDownloadReceipt = async () => {
     setIsDownloadingPdf(true);
     try {
+      // Use the REAL transaction hash from the voter's stored receipt.
+      // A fabricated hash would not verify on Sepolia and would be detectable.
+      let transactionHash = "";
+      try {
+        const wallet = safeVoterInfo?.account || safeVoter?.walletAddress || "";
+        const receipts = wallet ? await findReceiptsByWallet(wallet) : [];
+        const withHash = (receipts || []).find((r) => r.transactionHash);
+        transactionHash = withHash?.transactionHash || "";
+      } catch (lookupError) {
+        console.warn("Receipt hash lookup failed:", lookupError?.message);
+      }
+
       const receiptData = {
         verificationId: `IEBC-${(safeVoterInfo?.account || "VOTER").slice(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`,
         voterName: safeVoter?.fullName || safeVoterInfo?.fullName || "Verified Kenyan Citizen",
@@ -299,7 +312,7 @@ const SimpleVotingInterface = ({
         constituency: safeVoter?.constituency || "General",
         ward: safeVoter?.ward || "General",
         pollingStation: `Digital Polling Center ${safeVoter?.ward || "01"}`,
-        transactionHash: "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
+        transactionHash: transactionHash || "Recorded on-chain - verification available on the Verify Vote page",
         timestamp: new Date().toISOString(),
       };
       await downloadReceiptPDF(receiptData);
