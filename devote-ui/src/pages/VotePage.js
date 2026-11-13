@@ -3,7 +3,6 @@ import Navbar from '../components/Navbar';
 import AdminPanel from '../components/AdminPanel';
 import ElectionDashboard from '../components/ElectionDashboard';
 import { authenticateVoter } from '../services/registrationService';
-import { checkSmileVerificationStatus, verifyVoterIdentity } from '../services/smileIdService';
 
 /**
  * VotePage - Main voting page with sign-in gate
@@ -75,10 +74,6 @@ const VotePage = ({
   const [authError, setAuthError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [voterData, setVoterData] = useState(null); // { county, constituency, ward }
-  const [smileGateBlocked, setSmileGateBlocked] = useState(false);
-  const [smileGateStatus, setSmileGateStatus] = useState(null);
-  const [isSmileVerifying, setIsSmileVerifying] = useState(false);
-  const [smileDob, setSmileDob] = useState('');
   
   // IEBC Staff form state
   const [staffForm, setStaffForm] = useState({
@@ -189,46 +184,7 @@ const VotePage = ({
       );
 
       if (result.success) {
-        // Verify Smile ID KYC status
-        const voterWallet = result.voter?.walletAddress || account;
-        let smileVerified = result.voter?.smileStatus === 'smile_verified' || result.voter?.smileStatus === 'verified';
-        
-        if (!smileVerified && voterWallet) {
-          const check = await checkSmileVerificationStatus(voterWallet);
-          smileVerified = check.verified;
-        }
-
-        if (!smileVerified && result.voter?.smileStatus === 'smile_rejected') {
-          setSmileGateBlocked(true);
-          setSmileGateStatus({
-            status: 'REJECTED',
-            message: 'Your identity could not be verified by Smile ID. Staged on IEBC Admin Panel.',
-            voter: result.voter,
-          });
-          return;
-        }
-
-        if (!smileVerified && result.voter?.smileStatus === 'pending_review') {
-          setSmileGateBlocked(true);
-          setSmileGateStatus({
-            status: 'PENDING_REVIEW',
-            message: 'Your voter registration is currently staged for manual review in the IEBC Admin Panel.',
-            voter: result.voter,
-          });
-          return;
-        }
-
-        if (!smileVerified) {
-          setSmileGateBlocked(true);
-          setSmileGateStatus({
-            status: 'UNVERIFIED',
-            message: 'In accordance with IEBC requirements, automated Smile ID verification is required to unlock your ballot.',
-            voter: result.voter,
-          });
-          return;
-        }
-
-        // Authentication & Smile ID verification successful - mark voter as logged in
+        // Authentication successful - mark voter as logged in
         setVoterLoggedIn(true);
         
         // Store voter location data for filtering
@@ -263,50 +219,6 @@ const VotePage = ({
       setAuthError('Authentication failed. Please try again.');
     } finally {
       setIsAuthenticating(false);
-    }
-  };
-
-  const handleInlineSmileVerify = async () => {
-    if (!smileDob) {
-      alert('Please enter your date of birth for automated Smile ID verification.');
-      return;
-    }
-    setIsSmileVerifying(true);
-    try {
-      const activeVoter = smileGateStatus?.voter;
-      const res = await verifyVoterIdentity({
-        nationalId: activeVoter?.idNumber || voterForm.nationalId,
-        fullName: activeVoter?.fullName || voterForm.fullName,
-        dob: smileDob,
-        walletAddress: activeVoter?.walletAddress || account || `wallet_${voterForm.nationalId}`,
-      });
-
-      if (res.status === 'VERIFIED') {
-        setSmileGateBlocked(false);
-        setVoterLoggedIn(true);
-        if (activeVoter) {
-          const voterLocationData = {
-            fullName: activeVoter.fullName || voterForm.fullName || "Citizen Voter",
-            county: activeVoter.county,
-            constituency: activeVoter.constituency,
-            ward: activeVoter.ward,
-          };
-          setVoterData(voterLocationData);
-          if (typeof onVoterLogin === 'function') {
-            onVoterLogin(voterLocationData);
-          }
-        }
-      } else {
-        setSmileGateStatus({
-          status: res.status,
-          message: res.message || 'Verification submitted. Staged for official IEBC review.',
-          voter: activeVoter,
-        });
-      }
-    } catch (e) {
-      alert(e.message || 'Verification failed. Please try again.');
-    } finally {
-      setIsSmileVerifying(false);
     }
   };
 
@@ -354,7 +266,7 @@ const VotePage = ({
 
   // Determine what to show
   const shouldShowGateCard = !showSignInSection && !voterLoggedIn && !staffLoggedIn;
-  const shouldShowLoginForm = !smileGateBlocked && showSignInSection && !voterLoggedIn && !staffLoggedIn;
+  const shouldShowLoginForm = showSignInSection && !voterLoggedIn && !staffLoggedIn;
   const shouldShowVoterBallot = voterLoggedIn && !isAdmin;
   const shouldShowAdminPanel = staffLoggedIn && isAdmin;
   // Only show "Access Denied" after admin verification is complete
@@ -374,93 +286,8 @@ const VotePage = ({
         resultsLocked={!(voterInfo?.hasVotedAny || hasVoted) && !electionEnded && !isAdmin}
       />
 
-      {/* ===== SMILE ID IDENTITY VERIFICATION GATE ===== */}
-      {smileGateBlocked && (
-        <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-8">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-w-md w-full text-center">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
-              smileGateStatus?.status === 'REJECTED' ? 'bg-red-100' : 'bg-yellow-100'
-            }`}>
-              {smileGateStatus?.status === 'REJECTED' ? (
-                <svg className="w-10 h-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              ) : (
-                <svg className="w-10 h-10 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              )}
-            </div>
-
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-3 bg-gray-100 text-gray-800 border border-gray-200">
-              <span className={`w-2 h-2 rounded-full ${
-                smileGateStatus?.status === 'REJECTED' ? 'bg-red-500' : 'bg-yellow-500'
-              }`}></span>
-              Smile ID: {smileGateStatus?.status === 'REJECTED' ? 'Verification Failed' : 'Verification Required'}
-            </div>
-
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              National Identity Gate
-            </h2>
-
-            <p className="text-gray-600 mb-6 text-sm">
-              {smileGateStatus?.message || 'Under Kenya election cybersecurity guidelines, all voters must have their identity verified prior to casting an official ballot.'}
-            </p>
-
-            {smileGateStatus?.status === 'UNVERIFIED' && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-left space-y-3">
-                <label className="block text-xs font-semibold text-gray-700">
-                  Confirm Date of Birth (for Smile ID Enhanced KYC):
-                </label>
-                <input
-                  type="date"
-                  value={smileDob}
-                  onChange={(e) => setSmileDob(e.target.value)}
-                  max={new Date(Date.now() - 18 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                />
-                <button
-                  onClick={handleInlineSmileVerify}
-                  disabled={isSmileVerifying}
-                  className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all text-sm flex items-center justify-center gap-2"
-                >
-                  {isSmileVerifying ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Verifying with Smile ID...
-                    </>
-                  ) : (
-                    'Verify with Smile ID Now'
-                  )}
-                </button>
-              </div>
-            )}
-
-            {smileGateStatus?.status === 'PENDING_REVIEW' && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-xs text-yellow-800 text-left">
-                Your request has been forwarded to the IEBC returning officers' admin panel. Once approved, you will be able to access the ballot immediately.
-              </div>
-            )}
-
-            <button
-              onClick={() => {
-                setSmileGateBlocked(false);
-                setSmileGateStatus(null);
-                setVoterLoggedIn(false);
-              }}
-              className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Back to Sign In
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ===== GATE CARD: Please Sign In to Vote ===== */}
-      {!smileGateBlocked && shouldShowGateCard && (
+      {shouldShowGateCard && (
         <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-6 sm:py-12">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-w-md w-full text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
