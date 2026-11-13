@@ -90,41 +90,51 @@ export const compressAndResizeImage = (source, maxDimension = 1000, quality = 0.
 
 /**
  * Preprocess an image for ultra-fast and accurate Tesseract OCR
- * Converts to optimized grayscale with contrast enhancement
- * @param {string} base64Url - Input compressed image
- * @returns {Promise<string>} High-contrast grayscale data URL
+ * Converts to high-resolution linear grayscale with lossless PNG export
+ * @param {string} base64Url - Input image
+ * @returns {Promise<string>} High-resolution lossless PNG data URL
  */
 export const prepareImageForOcr = (base64Url) => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       try {
-        const targetWidth = Math.min(1000, img.width);
-        const targetHeight = Math.round((img.height * targetWidth) / img.width);
+        // Use up to 1600px width/height for razor sharp text recognition by Tesseract
+        const maxOcrDim = 1600;
+        let { width, height } = img;
+        if (width > maxOcrDim || height > maxOcrDim) {
+          if (width > height) {
+            height = Math.round((height * maxOcrDim) / width);
+            width = maxOcrDim;
+          } else {
+            width = Math.round((width * maxOcrDim) / height);
+            height = maxOcrDim;
+          }
+        }
 
         const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
 
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
 
-        // Grayscale + Contrast normalization
-        const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+        // Convert to linear luminance grayscale without destructive contrast thresholding
+        const imgData = ctx.getImageData(0, 0, width, height);
         const d = imgData.data;
 
         for (let i = 0; i < d.length; i += 4) {
-          // Standard luminance formula
           const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          // Slight contrast stretch
-          const contrast = gray > 130 ? Math.min(255, gray * 1.15) : Math.max(0, gray * 0.85);
-          d[i] = contrast;
-          d[i + 1] = contrast;
-          d[i + 2] = contrast;
+          d[i] = gray;
+          d[i + 1] = gray;
+          d[i + 2] = gray;
         }
 
         ctx.putImageData(imgData, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        // Export as PNG (lossless) so Tesseract has zero JPEG compression ringing around numbers
+        resolve(canvas.toDataURL('image/png'));
       } catch (_) {
         resolve(base64Url);
       }

@@ -246,8 +246,8 @@ const RegistrationPage = ({
     setOcrError('');
 
     try {
-      // Immediately compress & downscale to ~70KB to prevent Firestore >1MB errors and speed up OCR 10x
-      const compressedBase64 = await compressAndResizeImage(file, 1000, 0.72);
+      // Compress with high clarity (1600px, 0.85) so Tesseract OCR can accurately read all ID numbers
+      const compressedBase64 = await compressAndResizeImage(file, 1600, 0.85);
 
       let currentFront = idFrontPreview;
       let currentBack = idBackPreview;
@@ -299,6 +299,8 @@ const RegistrationPage = ({
       setOcrResult(result);
       if (!result.isValid) {
         setOcrError(result.summary || 'Uploaded document does not match entered details.');
+      } else {
+        setOcrError('');
       }
     } catch (err) {
       console.error('[RegistrationPage] OCR failed:', err);
@@ -306,6 +308,21 @@ const RegistrationPage = ({
     } finally {
       setIsOcrScanning(false);
       setOcrProgress(0);
+    }
+  };
+
+  const handleApplyExtractedId = (newId) => {
+    if (!newId) return;
+    setPersonalDetails(prev => ({ ...prev, nationalId: newId }));
+    if (ocrResult) {
+      setOcrResult(prev => ({
+        ...prev,
+        isValid: true,
+        idNumberMatched: true,
+        extractedId: newId,
+        summary: `Document verified: Authentic ${prev.cardType} confirmed (ID: ${newId}).`,
+      }));
+      setOcrError('');
     }
   };
 
@@ -1266,16 +1283,75 @@ const RegistrationPage = ({
                   </div>
                 )}
 
-                {!isOcrScanning && ocrResult && ocrResult.isValid && (
-                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-xs text-green-800">
-                    <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="font-medium">{ocrResult.summary || 'National ID document verified: Authenticity confirmed and details match.'}</span>
+                {/* OCR Results / Extracted ID Information Card */}
+                {!isOcrScanning && ocrResult && (
+                  <div className={`mt-3 p-3.5 rounded-xl border text-xs space-y-2.5 transition-all ${
+                    ocrResult.isValid 
+                      ? 'bg-green-50/70 border-green-300 text-green-900' 
+                      : 'bg-amber-50/70 border-amber-300 text-amber-900'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold flex items-center gap-1.5">
+                        {ocrResult.isValid ? (
+                          <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                          </svg>
+                        )}
+                        <span>{ocrResult.isValid ? 'Document Verified' : 'Document Analysis'}</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium">
+                        {ocrResult.cardType || 'Kenyan National ID'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 p-2 bg-white/80 rounded-lg border border-gray-200">
+                      <div>
+                        <span className="text-gray-500 block text-[11px]">Extracted ID Number:</span>
+                        <span className="font-bold text-gray-900 font-mono text-sm">
+                          {ocrResult.extractedId || 'Not detected'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[11px]">Entered ID Number:</span>
+                        <span className="font-mono text-gray-800 text-sm">
+                          {personalDetails.nationalId || '(empty)'}
+                        </span>
+                      </div>
+                      {ocrResult.extractedName && (
+                        <div className="col-span-2 pt-1 border-t border-gray-100">
+                          <span className="text-gray-500 block text-[11px]">Extracted Name:</span>
+                          <span className="font-semibold text-gray-800">{ocrResult.extractedName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Typo resolution helper */}
+                    {!ocrResult.isValid && ocrResult.extractedId && ocrResult.extractedId !== personalDetails.nationalId && (
+                      <div className="pt-1 flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-amber-200">
+                        <span className="text-[11px] text-amber-800">
+                          ID mismatch? Click to use the ID extracted from the card:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyExtractedId(ocrResult.extractedId)}
+                          className="px-2.5 py-1 bg-green-600 text-white font-semibold rounded text-xs hover:bg-green-700 transition-colors shadow-sm shrink-0"
+                        >
+                          Use Extracted ID: {ocrResult.extractedId}
+                        </button>
+                      </div>
+                    )}
+
+                    <p className={`text-[11px] ${ocrResult.isValid ? 'text-green-800' : 'text-amber-800'}`}>
+                      {ocrResult.summary}
+                    </p>
                   </div>
                 )}
 
-                {!isOcrScanning && ocrError && (
+                {!isOcrScanning && !ocrResult && ocrError && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-xs text-red-700">
                     <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
