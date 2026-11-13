@@ -222,6 +222,48 @@ export const authenticateVoter = async (fullName, nationalId, pin) => {
     });
     
     if (!matchingVoter) {
+      // Fallback (demo mode): also match completed registration requests that
+      // are still pending approval, so no voter who finished registration is
+      // dead-ended at sign-in. Approved voters are always matched first.
+      try {
+        const requestsRef = collection(db, REGISTRATION_COLLECTION);
+        const pendingSnapshot = await getDocs(requestsRef);
+        const pendingVoters = [];
+        pendingSnapshot.forEach((doc) => {
+          pendingVoters.push({ id: doc.id, ...doc.data() });
+        });
+
+        const pendingMatch = pendingVoters.find((voter) => {
+          const voterName = (voter.fullName || '').trim().toLowerCase();
+          const voterIdNumber = (voter.idNumber || voter.nationalId || '').trim();
+          const voterPin = (voter.pin || '').trim();
+          return (
+            voterName === normalizedFullName &&
+            voterIdNumber === normalizedIdNumber &&
+            voterPin === normalizedPin
+          );
+        });
+
+        if (pendingMatch) {
+          console.log('[RegistrationService] Voter authenticated via registration request (pending approval):', pendingMatch.id);
+          return {
+            success: true,
+            voter: {
+              id: pendingMatch.id,
+              fullName: pendingMatch.fullName,
+              idNumber: pendingMatch.idNumber || pendingMatch.nationalId,
+              county: pendingMatch.county,
+              constituency: pendingMatch.constituency,
+              ward: pendingMatch.ward,
+              walletAddress: pendingMatch.walletAddress,
+              status: pendingMatch.status || 'pending',
+            },
+          };
+        }
+      } catch (fallbackError) {
+        console.warn('[RegistrationService] Registration request fallback failed:', fallbackError.message);
+      }
+
       console.log('[RegistrationService] No matching voter found. Checked', voters.length, 'voters.');
       return {
         success: false,

@@ -847,9 +847,11 @@ const RegistrationPage = ({
       return;
     }
 
+    // OCR validation is ADVISORY ONLY for now (demo mode): a failed document
+    // check must not block registration. The status is still shown in the UI
+    // and stored with the record for admin review.
     if (!ocrResult || !ocrResult.isValid) {
-      setOcrError(ocrResult?.summary || 'National ID verification failed. Please check your entered details and upload clear photos.');
-      return;
+      console.warn('[RegistrationPage] Document check advisory - continuing without blocking:', ocrResult?.summary || 'OCR not verified');
     }
 
     if (!selfie && !selfiePreview) {
@@ -1346,7 +1348,7 @@ const RegistrationPage = ({
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !idFrontPreview || !idBackPreview || !ocrResult?.isValid || !selfiePreview}
+                  disabled={isSubmitting || !idFrontPreview || !idBackPreview || !selfiePreview}
                   className="px-6 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
                 >
                   {isSubmitting ? (
