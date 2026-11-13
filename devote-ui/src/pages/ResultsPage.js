@@ -254,30 +254,30 @@ const ResultsPage = ({
           onNavigate={onNavigate}
         />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="h-4 bg-dark-green-50 rounded w-40 animate-pulse mb-6"></div>
-          <div className="h-10 bg-dark-green-50 rounded w-72 animate-pulse mb-10"></div>
+          <div className="h-4 bg-gray-100 rounded w-40 animate-pulse mb-6"></div>
+          <div className="h-10 bg-gray-100 rounded w-72 animate-pulse mb-10"></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="border border-gray-100 rounded-xl p-5">
-                <div className="h-3 bg-dark-green-50 rounded w-20 animate-pulse mb-3"></div>
-                <div className="h-8 bg-dark-green-50 rounded w-24 animate-pulse"></div>
+                <div className="h-3 bg-gray-100 rounded w-20 animate-pulse mb-3"></div>
+                <div className="h-8 bg-gray-100 rounded w-24 animate-pulse"></div>
               </div>
             ))}
           </div>
           <div className="flex gap-2 mb-8">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-9 bg-dark-green-50 rounded-lg w-28 animate-pulse"></div>
+              <div key={i} className="h-9 bg-gray-100 rounded-lg w-28 animate-pulse"></div>
             ))}
           </div>
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="border border-gray-100 rounded-xl p-4 flex items-center gap-4">
-                <div className="w-10 h-10 bg-dark-green-50 rounded-full animate-pulse"></div>
+                <div className="w-10 h-10 bg-gray-100 rounded-full animate-pulse"></div>
                 <div className="flex-1">
-                  <div className="h-4 bg-dark-green-50 rounded w-48 animate-pulse mb-2"></div>
-                  <div className="h-3 bg-dark-green-50 rounded w-32 animate-pulse"></div>
+                  <div className="h-4 bg-gray-100 rounded w-48 animate-pulse mb-2"></div>
+                  <div className="h-3 bg-gray-100 rounded w-32 animate-pulse"></div>
                 </div>
-                <div className="h-6 bg-dark-green-50 rounded w-16 animate-pulse"></div>
+                <div className="h-6 bg-gray-100 rounded w-16 animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -321,9 +321,9 @@ const ResultsPage = ({
   /* Main content                        */
   /* ---------------------------------- */
   const electionStatus = electionEnded
-    ? { label: "Final results", tone: "text-dark-green-700 bg-dark-green-100", dot: "bg-dark-green-500" }
+    ? { label: "Final results", tone: "text-dark-green-700 bg-dark-green-50", dot: "bg-dark-green-500" }
     : electionStarted
-    ? { label: "Voting in progress", tone: "text-dark-green-700 bg-dark-green-50", dot: "bg-dark-green-500 animate-pulse" }
+    ? { label: "Voting in progress", tone: "text-blue-700 bg-blue-50", dot: "bg-blue-500 animate-pulse" }
     : { label: "Election not started", tone: "text-amber-700 bg-amber-50", dot: "bg-amber-500" };
 
   return (
@@ -338,7 +338,7 @@ const ResultsPage = ({
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header - single compact row */}
-        <header className="pt-10 pb-6 border-b border-dark-green-100">
+        <header className="pt-10 pb-6 border-b border-gray-200">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -346,7 +346,7 @@ const ResultsPage = ({
                   <span className={`w-1.5 h-1.5 rounded-full ${electionStatus.dot}`}></span>
                   {electionStatus.label}
                 </span>
-                <span className="text-xs text-gray-400 uppercase tracking-wide">
+                <span className="text-xs text-blue-600 uppercase tracking-wide font-medium">
                   Live tally from {networkName} blockchain
                 </span>
               </div>
@@ -354,7 +354,7 @@ const ResultsPage = ({
                 <span className="w-10 h-10 rounded-xl bg-dark-green-600 flex items-center justify-center flex-shrink-0">
                   <BallotBoxIcon className="w-5 h-5 text-white" />
                 </span>
-                <h1 className="text-3xl md:text-4xl font-bold text-dark-green-900 tracking-tight">
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">
                   Election Results
                 </h1>
               </div>
@@ -366,7 +366,7 @@ const ResultsPage = ({
               <button
                 onClick={handleRefresh}
                 disabled={resultsLoading}
-                className={`inline-flex items-center gap-2 border border-dark-green-200 text-dark-green-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-dark-green-50 transition-colors ${
+                className={`inline-flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors ${
                   resultsLoading ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
@@ -380,14 +380,14 @@ const ResultsPage = ({
           {voter && (
             <p className="mt-3 text-sm text-gray-500">
               Showing results for{" "}
-              <span className="font-medium text-dark-green-700">
+              <span className="font-medium text-gray-900">
                 {[voter.county, voter.constituency, voter.ward].filter(Boolean).join(" · ")}
               </span>
             </p>
           )}
           {!voter && (
             <p className="mt-3 text-sm text-gray-500 inline-flex items-center gap-1.5">
-              <LockIcon className="w-3.5 h-3.5" />
+              <LockIcon className="w-3.5 h-3.5 text-blue-500" />
               Showing national (Presidential) results. Sign in on the Vote page to see your county, constituency, and ward races.
             </p>
           )}
@@ -395,28 +395,28 @@ const ResultsPage = ({
 
         {/* Stats - one tight band */}
         <section className="py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-dark-green-100 border border-dark-green-100 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
             <div className="bg-white p-4 md:p-5">
-              <p className="text-xs uppercase tracking-wide text-dark-green-500 mb-1">Total votes</p>
-              <p className="text-2xl md:text-3xl font-bold text-dark-green-900">
+              <p className="text-xs uppercase tracking-wide text-blue-600 mb-1">Total votes</p>
+              <p className="text-2xl md:text-3xl font-bold text-gray-900">
                 {totalVotes.toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-4 md:p-5">
-              <p className="text-xs uppercase tracking-wide text-dark-green-500 mb-1">Candidates</p>
+              <p className="text-xs uppercase tracking-wide text-blue-600 mb-1">Candidates</p>
               <p className="text-2xl md:text-3xl font-bold text-gray-900">
                 {locationFilteredCandidates.length}
               </p>
             </div>
             <div className="bg-white p-4 md:p-5">
-              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Leading candidate</p>
-              <p className="text-lg md:text-xl font-bold text-dark-green-900 truncate">
+              <p className="text-xs uppercase tracking-wide text-blue-600 mb-1">Leading candidate</p>
+              <p className="text-lg md:text-xl font-bold text-gray-900 truncate">
                 {leadingCandidate ? leadingCandidate.name : "—"}
               </p>
             </div>
             <div className="bg-white p-4 md:p-5">
-              <p className="text-xs uppercase tracking-wide text-dark-green-500 mb-1">Leading party</p>
-              <p className="text-lg md:text-xl font-bold text-dark-green-900 truncate">
+              <p className="text-xs uppercase tracking-wide text-blue-600 mb-1">Leading party</p>
+              <p className="text-lg md:text-xl font-bold text-gray-900 truncate">
                 {leadingParty || "—"}
               </p>
             </div>
@@ -440,11 +440,11 @@ const ResultsPage = ({
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                     activeTab === tab.id
                       ? "bg-dark-green-600 text-white shadow-sm"
-                      : "bg-white text-dark-green-700 hover:bg-dark-green-50 border border-dark-green-100"
+                      : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
                   }`}
                 >
                   {tab.label}
-                  <span className={`ml-1.5 text-xs ${activeTab === tab.id ? "text-dark-green-100" : "text-dark-green-400"}`}>
+                  <span className={`ml-1.5 text-xs ${activeTab === tab.id ? "text-dark-green-100" : "text-gray-400"}`}>
                     {count}
                   </span>
                 </button>
@@ -456,9 +456,9 @@ const ResultsPage = ({
         {/* Results list */}
         <section className="pb-10 flex-1">
           {sortedCandidates.length === 0 ? (
-            <div className="border border-dark-green-100 rounded-xl p-12 text-center">
-              <div className="w-14 h-14 bg-dark-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BarChartIcon className="w-7 h-7 text-dark-green-300" />
+            <div className="border border-gray-200 rounded-xl p-12 text-center">
+              <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BarChartIcon className="w-7 h-7 text-gray-300" />
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-1">
                 {activeTab === "All"
@@ -472,12 +472,12 @@ const ResultsPage = ({
           ) : (
             <>
               <div className="flex items-baseline justify-between mb-3">
-                <h2 className="text-sm font-semibold text-dark-green-500 uppercase tracking-wide">
+                <h2 className="text-sm font-semibold text-blue-600 uppercase tracking-wide">
                   {activeTab === "All"
                     ? "All Positions"
                     : `${getPositionDisplayName(activeTab)} Results`}
                 </h2>
-                <p className="text-sm text-dark-green-500">
+                <p className="text-sm text-gray-500">
                   {totalVotesForPosition.toLocaleString()} votes counted
                 </p>
               </div>
@@ -495,12 +495,12 @@ const ResultsPage = ({
                   const initial = candidate.name?.charAt(0)?.toUpperCase() || "?";
 
                   return (
-                    <div key={candidate.id || candidate.blockchainId || index} className="p-4 md:px-5 hover:bg-dark-green-50/40 transition-colors">
+                    <div key={candidate.id || candidate.blockchainId || index} className="p-4 md:px-5 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-3 md:gap-4">
                         {/* Rank */}
                         <span
                           className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
-                            isLeader ? "bg-dark-green-600 text-white" : "bg-dark-green-50 text-dark-green-600"
+                            isLeader ? "bg-dark-green-600 text-white" : "bg-gray-100 text-gray-500"
                           }`}
                         >
                           {rank}
@@ -545,16 +545,16 @@ const ResultsPage = ({
                           <div className="font-bold text-gray-900 text-lg">
                             {votes.toLocaleString()}
                           </div>
-                          <div className="text-xs font-semibold text-dark-green-600">{percentage}%</div>
+                          <div className="text-xs font-semibold text-gray-600">{percentage}%</div>
                         </div>
                       </div>
 
                       {/* Share bar */}
                       <div className="mt-3 ml-10 md:ml-14">
-                        <div className="h-1.5 bg-dark-green-50 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              isLeader ? "bg-dark-green-500" : "bg-dark-green-200"
+                              isLeader ? "bg-dark-green-500" : "bg-gray-200"
                             }`}
                             style={{ width: `${percentage}%` }}
                           ></div>
@@ -571,7 +571,7 @@ const ResultsPage = ({
         {/* Certified winners - only once the election has ended */}
         {electionEnded && winnerEntries.length > 0 && (
           <section className="pb-10">
-            <h2 className="text-sm font-semibold text-dark-green-500 uppercase tracking-wide mb-3">
+            <h2 className="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-3">
               Certified winners
             </h2>
             <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100">
@@ -602,7 +602,7 @@ const ResultsPage = ({
                         ))}
                       </div>
                     ) : (
-                      <p className="font-semibold text-dark-green-800 truncate flex items-center gap-1.5">
+                      <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
                         <CheckCircleIcon className="w-4 h-4 text-dark-green-600 flex-shrink-0" />
                         {info.winner?.name}{" "}
                         <span className="font-normal text-gray-500 text-sm">
@@ -633,12 +633,12 @@ const ResultsPage = ({
       </main>
 
       {/* Footer - single quiet line */}
-      <footer className="border-t border-dark-green-100 py-5">
+      <footer className="border-t border-gray-200 py-5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-1">
-          <p className="text-xs text-dark-green-700">
+          <p className="text-xs text-gray-500">
             DeVote Kenya Elections — official tally published on the {networkName} blockchain
           </p>
-          <p className="text-xs text-dark-green-400">
+          <p className="text-xs text-gray-400">
             Every record is verifiable and immutable
           </p>
         </div>
